@@ -26,9 +26,30 @@ class DomRenderer {
 
     }
 
-    // TODO:
     public partialRender(startVector: DocumentVector, endVector: DocumentVector): void {
-        console.log('partial rendering not yet implemented.');
+
+        // Find array of common ancestor-node-indexes:
+        const commonPath = this.commonVectorPath(startVector.path, endVector.path);
+
+        // Resolve node from path:
+        const lastCommonNode = this.resolvePathToNode(commonPath);
+
+        this.regenerateNode(lastCommonNode, commonPath);
+
+    }
+
+    public textNodeRender(vector: DocumentVector): void {
+
+        const textNodeObject = this.document.getTextNode(vector);
+        const nodeElement = this.resolvePathToNode(vector.path);
+
+        // Update innerText of nodeElement
+        if (!(nodeElement instanceof Text)) {
+            throw new Error(`Element resolved from vector path ${vector.path} is not an instance of Text`);
+        }
+
+        nodeElement.innerText = textNodeObject.content;
+
     }
 
     // Generates paragraph element
@@ -92,10 +113,95 @@ class DomRenderer {
 
     }
 
-    private generateTextElement(text: TextObject): Node {
+    private generateTextElement(text: TextObject): Text {
         return document.createTextNode(text.content);
     }
 
+    private commonVectorPath(path1: number[], path2: number[]): number[] {
+
+        const minLength: number = Math.min(path1.length, path2.length);
+
+        const commonPath: number[] = [];
+
+        for (let i = 0; i < minLength; i++) {
+
+            if (path1[i] === path2[i]) {
+                commonPath.push(path1[i]);
+            } else {
+                break;
+            }
+
+        }
+
+        return commonPath;
+
+    }
+
+    private resolvePathToNode(path: number[]): HTMLElement {
+
+        let node: HTMLElement = this.rootElement;
+
+        for (const index of path) {
+
+            if (node.children[index] == undefined) {
+                throw new Error(`Unable to resolve path, index ${index} of an array of length ${node.children.length} was undefined.`);
+            }
+
+            if (!(node.children[index] instanceof HTMLElement)) {
+                throw new TypeError(`Child ${node.children[index]} is not of type HTMLElement`);
+
+            }
+
+            node = node.children[index] as HTMLElement;
+        }
+
+        return node;
+
+    }
+
+    // Function needs a rewrite - poor quality...
+    private regenerateNode(lastCommonNode: Node, nodePath: number[]): void {
+
+        if (!nodePath.length) {
+            this.render();
+            return;
+        }
+
+        const paragraphIndex: number = nodePath.shift() as number;
+
+        let endNode: FormatObject | TextObject | ParagraphObject = this.document.paragraphs[paragraphIndex];
+
+        for (let i = 0; i < nodePath.length; i++) {
+
+            endNode = endNode.children[nodePath[i]];
+
+            if (endNode.type !== 'format') {
+                return
+            }
+
+        }
+
+        let htmlElement: Node;
+
+        switch(endNode.type) {
+            case 'paragraph':
+                htmlElement = this.generateParagraphElement(endNode);
+                break;
+            case 'format':
+                htmlElement = this.generateFormatElement(endNode);
+                break;
+            default:
+                htmlElement = this.generateTextElement(endNode);
+        }
+
+        // TODO :: Change the lastCommonNode - element to htmlElement
+        if (lastCommonNode.parentNode) {
+            lastCommonNode.parentNode.replaceChild(htmlElement, lastCommonNode);
+        } else {
+            throw new Error (`Node must have a parent node to be replaceable`);
+        }        
+
+    }
 }
 
 export default DomRenderer;

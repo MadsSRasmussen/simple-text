@@ -1,5 +1,7 @@
 // Datasctructure types:
-type Format = 'strong' | 'em' | 'u';
+export type command = 'bold' | 'itallic' | 'underline';
+
+type format = 'strong' | 'em' | 'u';
 
 export interface TextObject {
     type: 'text';
@@ -8,7 +10,7 @@ export interface TextObject {
 
 export interface FormatObject {
     type: 'format';
-    format: Format;
+    format: format;
     children: [FormatObject | TextObject, ...(FormatObject | TextObject)[]];
 }
 

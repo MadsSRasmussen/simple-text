@@ -1,0 +1,18 @@
+.textBox {
+    border: 1px solid black;
+    box-sizing: border-box;
+}
+
+.textBox:focus {
+    outline: 2px solid red;
+}
+
+.carret {
+    border-right: 3px solid black;
+    position: absolute;
+    height: 16px;
+}
+
+p {
+    min-height: 16px;
+}

@@ -1,5 +1,5 @@
 // Datasctructure types:
-export type command = 'bold' | 'itallic' | 'underline';
+export type command = 'bold' | 'itallic' | 'underline' | 'insertParagraph' | 'deleteChatacter';
 
 type format = 'strong' | 'em' | 'u';
 
@@ -22,4 +22,9 @@ export interface ParagraphObject {
 export interface DocumentVector {
     path: number[];
     index: number;
+}
+
+export interface CarretPosition {
+    x: number,
+    y: number;
 }

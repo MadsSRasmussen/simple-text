@@ -1,5 +1,6 @@
 import Document from "../core/document-model.js";
-import { TextObject, FormatObject, ParagraphObject, DocumentVector } from "../types.js";
+import { TextObject, FormatObject, ParagraphObject, DocumentVector, CarretPosition } from "../types.js";
+import { resolvePathToNode } from "../utils/helpers/render.js";
 
 class DomRenderer {
 
@@ -32,7 +33,7 @@ class DomRenderer {
         const commonPath = this.commonVectorPath(startVector.path, endVector.path);
 
         // Resolve node from path:
-        const lastCommonNode = this.resolvePathToNode(commonPath);
+        const lastCommonNode = resolvePathToNode(this.rootElement, commonPath);
 
         this.regenerateNode(lastCommonNode, commonPath);
 
@@ -41,7 +42,7 @@ class DomRenderer {
     public textNodeRender(vector: DocumentVector): void {
 
         const textNodeObject = this.document.getTextNode(vector);
-        const nodeElement = this.resolvePathToNode(vector.path);
+        const nodeElement = resolvePathToNode(this.rootElement, vector.path);
 
         // Update innerText of nodeElement
         if (!(nodeElement instanceof Text)) {
@@ -134,28 +135,6 @@ class DomRenderer {
         }
 
         return commonPath;
-
-    }
-
-    private resolvePathToNode(path: number[]): Node {
-
-        let node: Node = this.rootElement;
-
-        for (const index of path) {
-
-            if (node.childNodes[index] == undefined) {
-                throw new Error(`Unable to resolve path, index ${index} of an array of length ${node.childNodes.length} was undefined.`);
-            }
-
-            if (!(node.childNodes[index] instanceof Node)) {
-                throw new TypeError(`Child ${node.childNodes[index]} is not of type HTMLElement`);
-
-            }
-
-            node = node.childNodes[index];
-        }
-
-        return node;
 
     }
 

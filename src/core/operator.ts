@@ -40,6 +40,34 @@ class Operator {
 
         const textNode: TextObject = this.document.getTextNode(destination);
 
+        if (destination.index == 0) {
+
+            // Cannot delete first paragraph
+            if (destination.path[0] == 0) {
+                return destination;
+            }
+
+            console.log('Removeing paragraph with index: ', destination.path[0]);
+
+            // Concat paragraph children with current children
+            const paragraph = this.document.paragraphs[destination.path[0]];
+            
+            const previousVector = this.document.getPreviousVector(destination);
+            console.log(previousVector);
+
+            // Delete paragraph
+            this.document.paragraphs = [...this.document.paragraphs.splice(0, destination.path[0]), ...this.document.paragraphs.splice(destination.path[0])]
+
+
+            // Concat two paragraphs
+            this.document.paragraphs[destination.path[0] - 1].children = [...this.document.paragraphs[destination.path[0] - 1].children, ...paragraph.children];
+
+            this.renderer.render();
+
+            return previousVector;
+
+        }
+
         // Check that index is between 0 and textNode.content.length;
         if (!indexIsValid(destination.index, 1, textNode.content.length)) {
             throw new Error(`Invalid index in destination.index of ${destination.index}`);

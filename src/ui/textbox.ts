@@ -47,25 +47,13 @@ class Textbox {
         this.textBoxElement.addEventListener('keydown', (e) => {
             
             if (e.key == 'ArrowLeft') {
-
-                const textNode = this.document.getTextNode(this.state.cursor);
-
-                if (indexIsValid(this.state.cursor.index - 1, 0, textNode.content.length)) {
-                    this.state.cursor.index -= 1;
-                    this.carret.render(this.textBoxElement, this.state.cursor);
-                }
-
+                this.state.cursor = this.document.getPreviousVector(this.state.cursor);
+                this.carret.render(this.textBoxElement, this.state.cursor);
             }
 
             if (e.key == 'ArrowRight') {
-
-                const textNode = this.document.getTextNode(this.state.cursor);
-
-                if (indexIsValid(this.state.cursor.index + 1, 0, textNode.content.length)) {
-                    this.state.cursor.index += 1;
-                    this.carret.render(this.textBoxElement, this.state.cursor);
-                }
-
+                this.state.cursor = this.document.getNextVector(this.state.cursor);
+                this.carret.render(this.textBoxElement, this.state.cursor);
             }
 
             if (this.commands.includes(e.key)) {

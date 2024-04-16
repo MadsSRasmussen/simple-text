@@ -57,8 +57,6 @@ class Operator {
 
     public insertParagraph(destination: DocumentVector): DocumentVector {
 
-        console.trace('called!')
-
         const textNode: TextObject = this.document.getTextNode(destination);
 
         // Check that index is between 0 and textNode.content.length;
@@ -82,7 +80,6 @@ class Operator {
 
         // Create new paragraph with textNode of lastBit, no style handeling for now...
         this.document.paragraphs = [...this.document.paragraphs.splice(0, destination.path[0] + 1), paragraph, ...this.document.paragraphs.splice(destination.path[0] + 1)];
-        console.log(this.document.paragraphs);
         this.renderer.render();
 
         const copiedPath = [...destination.path];

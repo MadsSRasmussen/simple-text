@@ -5,6 +5,7 @@ import Carret from "../rendering/carret-renderer.js";
 import DomRenderer from "../rendering/dom-renderer.js";
 
 import type { command } from "../types.js";
+import { indexIsValid } from "../utils/guards.js";
 
 class Textbox {
 
@@ -40,15 +41,35 @@ class Textbox {
 
     private init() {
 
-        const cursorPosition = this.state.cursor;
         this.container.appendChild(this.textBoxElement);
         this.contentRenderer.render();
 
         this.textBoxElement.addEventListener('keydown', (e) => {
             
+            if (e.key == 'ArrowLeft') {
+
+                const textNode = this.document.getTextNode(this.state.cursor);
+
+                if (indexIsValid(this.state.cursor.index - 1, 0, textNode.content.length)) {
+                    this.state.cursor.index -= 1;
+                    this.carret.render(this.textBoxElement, this.state.cursor);
+                }
+
+            }
+
+            if (e.key == 'ArrowRight') {
+
+                const textNode = this.document.getTextNode(this.state.cursor);
+
+                if (indexIsValid(this.state.cursor.index + 1, 0, textNode.content.length)) {
+                    this.state.cursor.index += 1;
+                    this.carret.render(this.textBoxElement, this.state.cursor);
+                }
+
+            }
+
             if (this.commands.includes(e.key)) {
-                // Handle commmand:
-                
+
                 switch(e.key.toLowerCase()) {
                     case 'enter':
                         this.exec('insertParagraph');
@@ -69,6 +90,14 @@ class Textbox {
             this.carret.render(this.textBoxElement, this.state.cursor);
 
         })
+
+        this.textBoxElement.addEventListener('focusin', () => {
+            this.carret.render(this.textBoxElement, this.state.cursor);
+        })
+
+        this.textBoxElement.addEventListener('focusout', () => {
+            this.carret.hide();
+        });
 
     }
 
@@ -105,7 +134,6 @@ function generateTextboxElement(): HTMLElement {
     container.setAttribute('tabindex', '0')
 
     container.addEventListener('click', function() {
-        console.log('In focus!')
         this.focus();
     });
 

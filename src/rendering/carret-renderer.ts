@@ -10,6 +10,7 @@ class Carret {
 
         this.carret = carret;
         rootElement.appendChild(this.carret);
+        this.hide();
 
     }
 
@@ -33,10 +34,17 @@ class Carret {
 
     private getCarretPosition(textNode: Node, vector: DocumentVector): CarretPosition {
 
+        if (!textNode.textContent && textNode.parentElement) {
+            const parentRect = textNode.parentElement?.getBoundingClientRect();
+            return { x: parentRect.left, y: parentRect.top };
+        }
+
         const range = document.createRange();
         range.setStart(textNode, vector.index);
         range.setEnd(textNode, vector.index);
         const rect = range.getBoundingClientRect();
+
+
 
         return { x: rect.left, y: rect.top }
 

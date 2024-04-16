@@ -1,5 +1,5 @@
-import Document from "../core/document-model";
-import { TextObject, FormatObject, ParagraphObject, DocumentVector } from "../types";
+import Document from "../core/document-model.js";
+import { TextObject, FormatObject, ParagraphObject, DocumentVector } from "../types.js";
 
 class DomRenderer {
 
@@ -14,7 +14,7 @@ class DomRenderer {
     }
 
     // Writes the html from data to the rootElement
-    public render():void {
+    public render(): void {
 
         // Reset rootElement html:
         this.rootElement.innerHTML = '';
@@ -48,7 +48,7 @@ class DomRenderer {
             throw new Error(`Element resolved from vector path ${vector.path} is not an instance of Text`);
         }
 
-        nodeElement.innerText = textNodeObject.content;
+        nodeElement.nodeValue = textNodeObject.content;
 
     }
 
@@ -137,22 +137,22 @@ class DomRenderer {
 
     }
 
-    private resolvePathToNode(path: number[]): HTMLElement {
+    private resolvePathToNode(path: number[]): Node {
 
-        let node: HTMLElement = this.rootElement;
+        let node: Node = this.rootElement;
 
         for (const index of path) {
 
-            if (node.children[index] == undefined) {
-                throw new Error(`Unable to resolve path, index ${index} of an array of length ${node.children.length} was undefined.`);
+            if (node.childNodes[index] == undefined) {
+                throw new Error(`Unable to resolve path, index ${index} of an array of length ${node.childNodes.length} was undefined.`);
             }
 
-            if (!(node.children[index] instanceof HTMLElement)) {
-                throw new TypeError(`Child ${node.children[index]} is not of type HTMLElement`);
+            if (!(node.childNodes[index] instanceof Node)) {
+                throw new TypeError(`Child ${node.childNodes[index]} is not of type HTMLElement`);
 
             }
 
-            node = node.children[index] as HTMLElement;
+            node = node.childNodes[index];
         }
 
         return node;
@@ -202,6 +202,7 @@ class DomRenderer {
         }        
 
     }
+
 }
 
 export default DomRenderer;

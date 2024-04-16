@@ -1,7 +1,7 @@
-import Document from "./document-model";
-import DomRenderer from "../rendering/dom-renderer";
-import { DocumentVector, TextObject, command } from "../types";
-import { indexIsValid } from "../utils/guards";
+import Document from "./document-model.js";
+import DomRenderer from "../rendering/dom-renderer.js";
+import { DocumentVector, TextObject, command } from "../types.js";
+import { indexIsValid } from "../utils/guards.js";
 
 // Class to handle inputs and manage the data and visual layer.
 class Operator {
@@ -16,7 +16,7 @@ class Operator {
 
     }
 
-    public insertText(destination: DocumentVector, text: string): void {
+    public insertText(destination: DocumentVector, text: string): DocumentVector {
 
         const textNode: TextObject = this.document.getTextNode(destination);
 
@@ -30,6 +30,9 @@ class Operator {
 
         // Re-render text-node
         this.renderer.textNodeRender(destination);
+
+        // Return new destination vector, that has an index text.length more than previous:
+        return { path: [...destination.path], index: destination.index + text.length }
 
     }
 

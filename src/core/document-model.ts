@@ -1,4 +1,4 @@
-import { DocumentVector, FormatObject, ParagraphObject, TextObject } from "../types";
+import { DocumentVector, FormatObject, ParagraphObject, TextObject } from "../types.js";
 
 class Document {
 
@@ -34,7 +34,7 @@ class Document {
 
         const copiedVector: DocumentVector = { ...vector };
 
-        const paragraphIndex = copiedVector.path.shift()
+        const paragraphIndex = copiedVector.path[0]
 
         // If the result of copiedVector.path.shift() is undefined, the array must have a length 0;
         if (paragraphIndex === undefined) {
@@ -53,7 +53,7 @@ class Document {
             return node.type === 'text';
         }
 
-        for (let i = 0; i < copiedVector.path.length; i++) {
+        for (let i = 1; i < copiedVector.path.length; i++) {
 
             const index = copiedVector.path[i];
 

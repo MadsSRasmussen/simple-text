@@ -1,7 +1,7 @@
 import Document from "./document-model.js";
 import DomRenderer from "../rendering/dom-renderer.js";
 import { DocumentVector, ParagraphObject, TextObject, command } from "../types.js";
-import { indexIsValid } from "../utils/guards.js";
+import { documentNodeIsTextNode, indexIsValid } from "../utils/guards.js";
 
 // Class to handle inputs and manage the data and visual layer.
 class Operator {
@@ -47,23 +47,45 @@ class Operator {
                 return destination;
             }
 
-            console.log('Removeing paragraph with index: ', destination.path[0]);
-
             // Concat paragraph children with current children
             const paragraph = this.document.paragraphs[destination.path[0]];
             
             const previousVector = this.document.getPreviousVector(destination);
-            console.log(previousVector);
 
             // Delete paragraph
-            this.document.paragraphs = [...this.document.paragraphs.splice(0, destination.path[0]), ...this.document.paragraphs.splice(destination.path[0])]
+            this.document.paragraphs = [...this.document.paragraphs.slice(0, destination.path[0]), ...this.document.paragraphs.slice(destination.path[0] + 1)]
 
+            const firstParagraphChildrenLength = this.document.paragraphs[destination.path[0] - 1].children.length;
 
             // Concat two paragraphs
             this.document.paragraphs[destination.path[0] - 1].children = [...this.document.paragraphs[destination.path[0] - 1].children, ...paragraph.children];
 
-            this.renderer.render();
+            // Merge if endNode of last child of first layer of first paragraph is textNode and first node of first layer of second paragraph is textNode.
+            const resultingParagraph = this.document.paragraphs[destination.path[0] - 1];
+            
+            // If no node is after the original first paragraph node, render immediatly, don't merge.
+            if (!resultingParagraph.children[firstParagraphChildrenLength]) {
+                this.renderer.render();
+                return previousVector;
+            }
+            
+            // Merge nodes:
+            if (documentNodeIsTextNode(resultingParagraph.children[firstParagraphChildrenLength - 1]) && documentNodeIsTextNode(resultingParagraph.children[firstParagraphChildrenLength])) {
+                
+                const firstNode = resultingParagraph.children[firstParagraphChildrenLength - 1];
+                const lastNode = resultingParagraph.children[firstParagraphChildrenLength]
+                
+                // Mergen content to firstNode
+                if (documentNodeIsTextNode(firstNode) && documentNodeIsTextNode(lastNode)) {
+                    firstNode.content += lastNode.content;
+                }
 
+                // Remove lastNode:
+                resultingParagraph.children.splice(firstParagraphChildrenLength, 1);
+
+            }
+
+            this.renderer.render();
             return previousVector;
 
         }
@@ -107,7 +129,7 @@ class Operator {
         }
 
         // Create new paragraph with textNode of lastBit, no style handeling for now...
-        this.document.paragraphs = [...this.document.paragraphs.splice(0, destination.path[0] + 1), paragraph, ...this.document.paragraphs.splice(destination.path[0] + 1)];
+        this.document.paragraphs = [...this.document.paragraphs.slice(0, destination.path[0] + 1), paragraph, ...this.document.paragraphs.slice(destination.path[0] + 1)];
         this.renderer.render();
 
         const copiedPath = [...destination.path];

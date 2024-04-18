@@ -1,15 +1,23 @@
-import { createIncrementalProgram } from "../../node_modules/typescript/lib/typescript";
-import { DocumentVector, CarretPosition } from "../types";
+import { DocumentVector, CarretPosition } from "../types.js";
 import { resolvePathToNode } from "../utils/helpers/render.js";
+import { generateCarretElement } from "../utils/html-generators.js";
 
 class Carret {
 
-    private carret: HTMLElement;
+    private carretElement: HTMLElement;
+    private rootElement: HTMLElement;
 
-    constructor(carret: HTMLElement, rootElement: HTMLElement) {
+    constructor () {
 
-        this.carret = carret;
-        rootElement.appendChild(this.carret);
+        const bodyElement = document.querySelector('body');
+
+        if (!bodyElement) {
+            throw new Error('No body element found, cannot instantiate carret.');
+        }
+
+        this.carretElement = generateCarretElement();
+        this.rootElement = bodyElement;
+        this.rootElement.appendChild(this.carretElement);
         this.hide();
 
     }
@@ -19,16 +27,16 @@ class Carret {
         const textNode = resolvePathToNode(rootElement, vector.path);
         const position = this.getCarretPosition(textNode, vector);
 
-        this.carret.style.left = `${position.x}px`;
-        this.carret.style.top = `${position.y}px`;
+        this.carretElement.style.left = `${position.x}px`;
+        this.carretElement.style.top = `${position.y}px`;
 
-        this.carret.style.display = 'block';
+        this.carretElement.style.display = 'block';
 
     }
 
     public hide(): void {
         
-        this.carret.style.display = 'none';
+        this.carretElement.style.display = 'none';
     
     }
 

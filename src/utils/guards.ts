@@ -11,3 +11,7 @@ export function documentNodeHasChildren(node: ParagraphObject | FormatObject | T
 export function documentNodeIsTextNode(node: ParagraphObject | FormatObject | TextObject): node is TextObject {
     return node.type === 'text';
 }
+
+export function selectionIsWithinElement(selection: Selection, element: Node): boolean {
+    return (selection.rangeCount > 0 && element.contains(selection.getRangeAt(0).commonAncestorContainer));
+}

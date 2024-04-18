@@ -1,15 +1,18 @@
-import Document from "../core/document-model.js";
+import Document from "../models/document-model.js";
+import DocumentOperator from "../operators/document-operator.js";
 import { TextObject, FormatObject, ParagraphObject, DocumentVector, CarretPosition } from "../types.js";
 import { resolvePathToNode } from "../utils/helpers/render.js";
 
 class DomRenderer {
 
     private document: Document;
+    private documentOperator: DocumentOperator;
     private rootElement: HTMLElement;
 
-    constructor(document: Document, rootElement: HTMLElement) {
+    constructor(document: Document, documentOperator: DocumentOperator, rootElement: HTMLElement) {
 
         this.document = document;
+        this.documentOperator = documentOperator;
         this.rootElement = rootElement;
 
     }
@@ -41,7 +44,7 @@ class DomRenderer {
 
     public textNodeRender(vector: DocumentVector): void {
 
-        const textNodeObject = this.document.getTextNode(vector);
+        const textNodeObject = this.documentOperator.getTextNode(vector);
         const nodeElement = resolvePathToNode(this.rootElement, vector.path);
 
         // Update innerText of nodeElement

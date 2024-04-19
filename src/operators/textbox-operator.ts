@@ -24,10 +24,16 @@ class TextboxOperator {
     }
 
     public updateCarret(): void {
-        this.carret.render(this.textboxElement, this.state.cursor);
+
+        if (!this.state.selectionRange) {
+            this.carret.render(this.textboxElement, this.state.cursor);
+        } else {
+            this.carret.hide();
+        }
+        
     }
 
-    public updateCarretFromSelection(selection: Selection): void {
+    public updateSelectionState(selection: Selection) {
 
         if (!selectionIsWithinElement(selection, this.textboxElement)) {
             return;
@@ -35,27 +41,50 @@ class TextboxOperator {
 
         switch(selection.type) {
             case 'Caret':
-                
-                const range = selection.getRangeAt(0);
-                
-                // If startContainer is instance of Text, a complete vector can be found.
-                if (range.startContainer instanceof Text) {
-
-                    const rangeVector: DocumentVector = {
-                        path: resolveNodeToPath(this.textboxElement, range.startContainer),
-                        index: range.startOffset
-                    }
-
-                    this.state.cursor = rangeVector;
-                    this.updateCarret();
-
-                }
-
+                this.updateSelectionStateCaret(selection);
                 break;
             case 'Range':
+                this.updateSelectionStateRange(selection);
                 break;
-            default:
-                console.log('Selection is neither carret or range!');
+        }
+
+    }
+
+    private updateSelectionStateCaret(selection: Selection) {
+
+        const anchorNode = selection.anchorNode;
+
+        if (!anchorNode) {
+            return;
+        }
+
+        if (anchorNode instanceof Text) {
+            this.state.cursor = {
+                path: resolveNodeToPath(this.textboxElement, anchorNode),
+                index: selection.anchorOffset
+            }
+            this.state.selectionRange = null;
+        }
+
+    }
+
+    private updateSelectionStateRange(selection: Selection) {
+
+        const range = selection.getRangeAt(0);
+
+        if ((range.startContainer instanceof Text) && (range.endContainer instanceof Text)) {
+            const startVector: DocumentVector = { 
+                path: resolveNodeToPath(this.textboxElement, range.startContainer),
+                index: range.startOffset
+            }
+            const endVector: DocumentVector = {
+                path: resolveNodeToPath(this.textboxElement, range.endContainer),
+                index: range.endOffset
+            }
+            this.state.selectionRange = {
+                start: startVector,
+                end: endVector
+            }
         }
 
     }

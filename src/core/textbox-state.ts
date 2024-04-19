@@ -1,22 +1,16 @@
-import { DocumentVector } from "../types";
+import { DocumentVector, SelectionRange } from "../types";
 
 class TextboxState {
 
-    private _cursor: DocumentVector;
+    public cursor: DocumentVector;
+    public selectionRange: SelectionRange | null;
 
     constructor() {
-        this._cursor = {
+        this.cursor = {
             path: [0, 0],
             index: 0
         }
-    }
-
-    get cursor(): DocumentVector {
-        return this._cursor;
-    }
-
-    set cursor(vector: DocumentVector) {
-        this._cursor = vector;
+        this.selectionRange = null;
     }
 
 }

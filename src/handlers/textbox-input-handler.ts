@@ -42,7 +42,8 @@ class TextboxInputHandler {
             return;
         }
 
-        this.textboxOperator.updateCarretFromSelection(selection);
+        this.textboxOperator.updateSelectionState(selection);
+        this.textboxOperator.updateCarret();
 
 
     };

@@ -28,3 +28,8 @@ export interface CarretPosition {
     x: number,
     y: number;
 }
+
+export interface SelectionRange {
+    start: DocumentVector,
+    end: DocumentVector
+}

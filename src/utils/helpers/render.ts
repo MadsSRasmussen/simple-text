@@ -2,6 +2,7 @@ export function resolvePathToNode(rootElement: HTMLElement, path: number[]): Nod
 
     let node: Node = rootElement;
 
+
     for (const index of path) {
 
         if (node.childNodes[index] == undefined) {

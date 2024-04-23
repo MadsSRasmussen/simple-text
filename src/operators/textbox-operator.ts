@@ -1,7 +1,7 @@
 import TextboxState from "../core/textbox-state.js";
 import Carret from "../rendering/carret-renderer.js";
 import DomRenderer from "../rendering/dom-renderer.js";
-import { DocumentVector } from "../types.js";
+import { DocumentVector, format } from "../types.js";
 import DocumentOperator from "./document-operator.js";
 
 import { selectionIsWithinElement } from "../utils/guards.js";
@@ -26,6 +26,7 @@ class TextboxOperator {
     public updateCarret(): void {
 
         if (!this.state.selectionRange) {
+            this.state.selectionFormats = this.documentOperator.getFormats(this.state.cursor);
             this.carret.render(this.textboxElement, this.state.cursor);
         } else {
             this.carret.hide();
@@ -33,7 +34,7 @@ class TextboxOperator {
         
     }
 
-    public updateSelectionState(selection: Selection) {
+    public updateSelectionState(selection: Selection): void {
 
         if (!selectionIsWithinElement(selection, this.textboxElement)) {
             return;
@@ -50,7 +51,7 @@ class TextboxOperator {
 
     }
 
-    private updateSelectionStateCaret(selection: Selection) {
+    private updateSelectionStateCaret(selection: Selection): void {
 
         const anchorNode = selection.anchorNode;
 
@@ -59,32 +60,51 @@ class TextboxOperator {
         }
 
         if (anchorNode instanceof Text) {
-            this.state.cursor = {
+            const resultingVector: DocumentVector = {
                 path: resolveNodeToPath(this.textboxElement, anchorNode),
                 index: selection.anchorOffset
             }
-            this.state.selectionRange = null;
+            this.state.cursor = resultingVector;
+        } else {
+            const path = resolveNodeToPath(this.textboxElement, anchorNode);
+            const resultingVector: DocumentVector = this.documentOperator.getTrailingNodeVector(path);
+            this.state.cursor = resultingVector;
         }
+
+        this.state.selectionRange = null;
 
     }
 
-    private updateSelectionStateRange(selection: Selection) {
+    private updateSelectionStateRange(selection: Selection): void {
 
         const range = selection.getRangeAt(0);
 
-        if ((range.startContainer instanceof Text) && (range.endContainer instanceof Text)) {
-            const startVector: DocumentVector = { 
+        let startVector: DocumentVector;
+        let endVector: DocumentVector;
+
+        if (range.startContainer instanceof Text) {
+            startVector = { 
                 path: resolveNodeToPath(this.textboxElement, range.startContainer),
                 index: range.startOffset
             }
-            const endVector: DocumentVector = {
+        } else {
+            const path = resolveNodeToPath(this.textboxElement, range.startContainer);
+            startVector = this.documentOperator.getTrailingNodeVector(path);
+        }
+
+        if (range.endContainer instanceof Text) {
+            endVector = {
                 path: resolveNodeToPath(this.textboxElement, range.endContainer),
                 index: range.endOffset
-            }
-            this.state.selectionRange = {
-                start: startVector,
-                end: endVector
-            }
+            };
+        } else {
+            const path = resolveNodeToPath(this.textboxElement, range.startContainer);
+            endVector = this.documentOperator.getTrailingNodeVector(path);
+        }
+
+        this.state.selectionRange = {
+            start: startVector,
+            end: endVector
         }
 
     }
@@ -119,14 +139,26 @@ class TextboxOperator {
 
     // Deletes character or paragraph depending on state.cursor.index
     public backspace(): void {
-        if (this.state.cursor.index == 0) {
-            this.state.cursor = this.documentOperator.deleteParagraph(this.state.cursor);
-            this.domRenderer.render();
-        } else {
-            this.state.cursor = this.documentOperator.deleteChatacter(this.state.cursor);
-            this.domRenderer.textNodeRender(this.state.cursor);
-        }
+
+        const deleteResult = this.documentOperator.deleteSingle(this.state.cursor);
+        this.state.cursor = deleteResult.newVector;
+        this.domRenderer.renderFromPath(deleteResult.latestChangedPath);
         this.updateCarret();
+        return;
+
+    }
+
+    public format(format: format) {
+        
+        if (this.state.selectionFormats[format] == true) {
+            this.state.cursor = this.documentOperator.undoFormatRewrite(this.state.cursor, format);
+        } else {
+            this.state.cursor = this.documentOperator.insertFormat(this.state.cursor, format);
+        }
+
+        this.domRenderer.render();
+        this.updateCarret();
+
     }
 
 }

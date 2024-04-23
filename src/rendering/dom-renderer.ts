@@ -1,6 +1,7 @@
 import Document from "../models/document-model.js";
 import DocumentOperator from "../operators/document-operator.js";
 import { TextObject, FormatObject, ParagraphObject, DocumentVector, CarretPosition } from "../types.js";
+import { documentNodeIsParagraphNode, documentNodeIsTextNode } from "../utils/guards.js";
 import { resolvePathToNode } from "../utils/helpers/render.js";
 
 class DomRenderer {
@@ -141,6 +142,54 @@ class DomRenderer {
 
     }
 
+    public renderFromPath(path: number[]): void {
+
+        // If the path is an empty array, rerender entire textbox:
+        if (!path.length) {
+            this.render();
+            return;
+        }
+
+        // Assemble new node:
+        const documentNode = this.documentOperator.getNodeByPath(path);
+        let domNode: Node;
+
+        if (documentNodeIsParagraphNode(documentNode)) {
+            domNode = this.generateParagraphElement(documentNode);
+        } else if (documentNodeIsTextNode(documentNode)) {
+            domNode = this.generateTextElement(documentNode);
+        } else {
+            domNode = this.generateFormatElement(documentNode);
+        }
+
+        this.replaceNode(path, domNode);
+
+    }
+
+    private replaceNode(path: number[], newNode: Node) {
+        if (path.length === 0) {
+            throw new Error("Path cannot be empty.");
+        }
+    
+        // Determine the parent node of the target node
+        const parentPath = path.slice(0, -1);
+        const parentNode = resolvePathToNode(this.rootElement, parentPath) as HTMLElement;
+    
+        if (!(parentNode instanceof HTMLElement)) {
+            throw new TypeError("The parent node resolved is not an HTMLElement.");
+        }
+    
+        const targetIndex = path[path.length - 1];
+    
+        if (parentNode.childNodes[targetIndex] === undefined) {
+            throw new Error(`No child exists at the target index ${targetIndex}.`);
+        }
+    
+        // Replace the old node with the new node
+        parentNode.replaceChild(newNode, parentNode.childNodes[targetIndex]);
+    }
+    
+
     // Function needs a rewrite - poor quality...
     private regenerateNode(lastCommonNode: Node, nodePath: number[]): void {
 
@@ -149,11 +198,11 @@ class DomRenderer {
             return;
         }
 
-        const paragraphIndex: number = nodePath.shift() as number;
+        const paragraphIndex: number = nodePath[0];
 
         let endNode: FormatObject | TextObject | ParagraphObject = this.document.paragraphs[paragraphIndex];
 
-        for (let i = 0; i < nodePath.length; i++) {
+        for (let i = 1; i < nodePath.length; i++) {
 
             endNode = endNode.children[nodePath[i]];
 

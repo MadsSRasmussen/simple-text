@@ -26,6 +26,7 @@
     animation: blink 1s step-start infinite;
 }
 
-p {
+.textBox p {
     min-height: var(--font-size);
+    width: fit-content;
 }

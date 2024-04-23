@@ -5,6 +5,7 @@ import TextboxInputHandler from "./handlers/textbox-input-handler.js";
 import TextboxOperator from "./operators/textbox-operator.js";
 import Carret from "./rendering/carret-renderer.js";
 import DomRenderer from "./rendering/dom-renderer.js";
+import { DocumentVector, FormatFlags } from "./types.js";
 
 class Textbox {
 
@@ -19,14 +20,14 @@ class Textbox {
     private operator: TextboxOperator;
     private renderer: DomRenderer;
 
-    constructor(textbox: HTMLElement) {
+    constructor(textbox: HTMLElement, onFormatChange: (formats: FormatFlags) => void) {
 
         this.document = new Document();
         this.carret = new Carret();
-        this.state = new TextboxState();
+        this.state = new TextboxState(onFormatChange);
 
         this.textbox = textbox;
-        this.documentOperator = new DocumentOperator(this.document)
+        this.documentOperator = new DocumentOperator(this.document, this.state)
         this.renderer = new DomRenderer(this.document, this.documentOperator, this.textbox)
         this.operator = new TextboxOperator(this.state, this.renderer, this.carret, this.documentOperator, this.textbox);
         this.inputHandler = new TextboxInputHandler(this.textbox, this.operator);
@@ -39,6 +40,14 @@ class Textbox {
 
         this.renderer.render();
 
+    }
+
+    public getData(): string {
+        return this.document.toString();
+    }
+
+    public getCursorVector(): DocumentVector {
+        return this.state.cursor;
     }
 
 }

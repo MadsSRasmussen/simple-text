@@ -42,17 +42,16 @@ class Carret {
 
     private getCarretPosition(textNode: Node, vector: DocumentVector): CarretPosition {
 
+        // If you click on an emptynparagraph...
         if (!textNode.textContent && textNode.parentElement) {
             const parentRect = textNode.parentElement?.getBoundingClientRect();
-            return { x: parentRect.left, y: parentRect.top };
+            return { x: parentRect.right, y: parentRect.top };
         }
 
         const range = document.createRange();
         range.setStart(textNode, vector.index);
         range.setEnd(textNode, vector.index);
         const rect = range.getBoundingClientRect();
-
-
 
         return { x: rect.left, y: rect.top }
 

@@ -1,7 +1,9 @@
 // Datasctructure types:
 export type command = 'bold' | 'itallic' | 'underline' | 'insertParagraph' | 'deleteChatacter';
 
-type format = 'strong' | 'em' | 'u';
+export type format = 'strong' | 'em' | 'u' | 'title';
+
+export type FormatFlags = Record<format, boolean>;
 
 export interface TextObject {
     type: 'text';

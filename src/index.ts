@@ -1,4 +1,5 @@
 import Textbox from './textbox.js';
+import { FormatFlags } from './types.js';
 import { generateTextboxElement } from './utils/html-generators.js';
 
 
@@ -12,9 +13,27 @@ document.addEventListener('select', () => {
 })
 */
 
+const formatDiv = document.getElementById('formats') as HTMLElement;
+
+const onFormatChange = (formats: FormatFlags) => {
+    formatDiv.innerHTML = JSON.stringify(formats);
+}
+
 const textBox = generateTextboxElement();
 document.querySelector('body')?.appendChild(textBox);
-const textBoxClass = new Textbox(textBox);
+const textBoxClass = new Textbox(textBox, onFormatChange);
+
+const logJsonButton = document.getElementById('logJson');
+logJsonButton?.addEventListener('click', (e) => {
+    e.preventDefault();
+    console.log(JSON.parse(textBoxClass.getData()));
+})
+
+const logCursorButton = document.getElementById('logCursor');
+logCursorButton?.addEventListener('click', (e) => {
+    e.preventDefault();
+    console.log(textBoxClass.getCursorVector())
+})
 
 /*
 document.addEventListener('selectionchange', () => {

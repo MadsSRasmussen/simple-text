@@ -50,6 +50,20 @@ class TextboxInputHandler {
 
     private keydownHandler(e: KeyboardEvent) {
 
+        if (e.metaKey || e.ctrlKey) {
+            switch(e.key) {
+                case 'b':
+                    this.textboxOperator.format('strong');
+                    return;
+                case 'i':
+                    this.textboxOperator.format('em');
+                    return;
+                case 'u':
+                    this.textboxOperator.format('u');
+                    return;
+            }
+        }
+
         switch(e.key) {
             case 'ArrowLeft':
                 this.textboxOperator.moveCarretLeft();

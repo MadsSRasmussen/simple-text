@@ -676,11 +676,16 @@ class DocumentOperator {
             const firstLeadingFromFormatNode = this.firstLeading(pathToRelevantFormatNode);
             if (documentVectorsAreDeeplyEqual(destination, firstLeadingFromFormatNode)) {
                 // We want to INSERT BEFORE relevant format node.
-                // Generate textObject nested in appropriate formatObjects, filter out format that is being undone
-                const { node, textNodePath } = generateNestedTextObject(this.state.getSelectionFormatsArray().filter(originalFormat => originalFormat !== format));
+                
+                // Get formats, that the relevantFormatNode itself is nested in.
+                const formatsOfFormatNode = this.getFormatsArrayOfNode(pathToRelevantFormatNode);
+
+                // Generate textObject nested in appropriate formatObjects, filter out format that is being undone ans formats of relevant format node.
+                const { node, textNodePath } = generateNestedTextObject(this.state.getSelectionFormatsArray().filter(originalFormat => !formatsOfFormatNode.concat(format).includes(originalFormat)));
 
                 // Purge formatNode for emptyChildren:
                 const { purgedNode, removedOrigin } = this.purgeNodeForEmptyTextNodes(pathToRelevantFormatNode);
+                console.log(purgedNode);
                 if (purgedNode == null) {
                     relevantFormatNodeParentNode.children.splice(indexOfFormatInParentArray, 1, node);
                 } else {
@@ -703,6 +708,7 @@ class DocumentOperator {
                 // Generate textObject nested in appropriate formatObjects, filter out format that is being undone ans formats of relevant format node.
                 const { node, textNodePath } = generateNestedTextObject(this.state.getSelectionFormatsArray().filter(originalFormat => !formatsOfFormatNode.concat(format).includes(originalFormat)));
 
+
                 // Purge formatNode for emptyChildren:
                 const { purgedNode, removedOrigin } = this.purgeNodeForEmptyTextNodes(pathToRelevantFormatNode);
                 if (purgedNode == null) {
@@ -719,8 +725,7 @@ class DocumentOperator {
                     // Resulting vector must be the path of the format node with last index + 1
                     return { path: [...pathToRelevantFormatNode.slice(0, -1), pathToRelevantFormatNode[pathToRelevantFormatNode.length - 1] + 1, ...textNodePath], index: 0 }
                 }
-
-                
+ 
             }
 
         }
@@ -760,7 +765,6 @@ class DocumentOperator {
 
         // Insert before
         if (indexOfTextInFormatChildrenArray == 0) {
-            console.log('First element!');
 
             // Delete textNode in formatNode.children
             formatNode.children.splice(indexOfTextInFormatChildrenArray, 1);
@@ -768,15 +772,12 @@ class DocumentOperator {
             // Place new empty textNode before indexOfFormatInParentArray in formatParentNode
             formatParentNode.children.splice(indexOfFormatInParentArray, 0, textObject);
 
-            console.log('Format parent node: ', formatParentNode);
-
             // Vector modification of path must be splice(0, -1) -> With an index of zero
             return { path: [...destination.path.slice(0, -1)], index: 0 };
             
 
         // Insert after
         } else if (indexOfTextInFormatChildrenArray == formatNode.children.length - 1) {
-            console.log('Last element!');
 
             // Delete textNode in formatNode.children
             formatNode.children.splice(indexOfTextInFormatChildrenArray, 1);
@@ -784,14 +785,11 @@ class DocumentOperator {
             // Place after indexOfFormatInParentArray in formatParentNode
             formatParentNode.children.splice(indexOfFormatInParentArray + 1, 0, textObject);
 
-            console.log('Format parent node: ', formatParentNode);
-
             // Vector modification of path must be splice(0, -2), indexOfFormatInParentArray + 1 -> With an index of zero:
             return { path: [...destination.path.slice(0, -2), indexOfFormatInParentArray + 1], index: 0 };
 
         // Insert into
         } else {
-            console.log('In the middle :)');
 
             // Split children of formatNode:
             const childrenBeforeTextNode = formatNode.children.slice(1, indexOfTextInFormatChildrenArray);

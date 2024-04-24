@@ -4,6 +4,7 @@ import { DocumentVector, ParagraphObject, FormatObject, TextObject } from "../ty
 import type { FormatFlags, format } from "../types.js";
 import { generateFormatObject, generateTextObject, generateFormatFlagsObject, getIndexOfChildInParentChildrenArray, documentVectorsAreDeeplyEqual, arraysAreDeeplyEqual, generateNestedTextObject } from "../utils/helpers/document.js";
 import TextboxState from "../core/textbox-state.js";
+import { collapseTextChangeRangesAcrossMultipleVersions } from "../../node_modules/typescript/lib/typescript.js";
 
 // Class to handle document related operations.
 // Class only deals with data layer.
@@ -586,10 +587,7 @@ class DocumentOperator {
     // Function to split a node along a DocumentVector. Function also purges objects, that only contains empty textNodes.
     private splitNodeAlongVector(vector: DocumentVector, path: number[]): { firstSplit: ParagraphObject | FormatObject | TextObject, lastSplit: ParagraphObject | FormatObject | TextObject } {
 
-        console.log('Splitting node!');
-
         const nodeToSplit = this.getNodeByPath(path);
-        console.log('Node to split: ', nodeToSplit);
 
         // Get contents splits of textNode.content
         if(documentNodeIsTextNode(nodeToSplit)) {
@@ -607,7 +605,56 @@ class DocumentOperator {
 
     }
 
-    public undoFormatRewrite(destination: DocumentVector, format: format): DocumentVector {
+    private purgeNodeForEmptyTextNodes(path: number[]): { purgedNode: TextObject | ParagraphObject | FormatObject | null, removedOrigin: boolean } {
+
+        const node = this.getNodeByPath(path);
+
+        // Basecase:
+        if (documentNodeIsTextNode(node)) {
+            if (node.content == '') {
+                return { purgedNode: null, removedOrigin: true };
+            } else  {
+                return { purgedNode: node, removedOrigin: false }
+            }
+        }
+
+        // We only intend to append children, where removedOrigin = false:
+        const purgedChildren: (TextObject | FormatObject)[] = [];
+
+        for (let i = 0; i < node.children.length; i++) {
+
+            const { purgedNode, removedOrigin } = this.purgeNodeForEmptyTextNodes([...path, i]);
+
+            if (removedOrigin == true) {
+                continue;
+            }
+            if (purgedNode == null) {
+                throw new Error('Purged node was equal to null, with removedOrigin being false');
+            }
+            if (documentNodeIsParagraphNode(purgedNode)) {
+                throw new Error('Purged child-node was of type paragraphObject')
+            }
+
+            purgedChildren.push(purgedNode);
+
+        }
+
+        if (purgedChildren.length > 0) {
+            return {
+                purgedNode: { ...node, children: [purgedChildren[0], ...purgedChildren.slice(1)] },
+                removedOrigin: false,
+            }
+        } else {
+            return {
+                purgedNode: null,
+                removedOrigin: true
+            }
+
+        }
+
+    }
+
+    public undoFormat(destination: DocumentVector, format: format): DocumentVector {
 
         // The textNode that destination points to:
         const textNode = this.getTextNode(destination);
@@ -619,6 +666,8 @@ class DocumentOperator {
             throw new Error('Relevant format node parent is a TextNode');
         }
 
+        const indexOfFormatInParentArray = getIndexOfChildInParentChildrenArray(relevantFormatNodeParentNode, relevantFormatNode);
+
         // Now, check if destination is at firstLeading or lastTrailing from the relevant formatNode.
         // This is only nesecary if index is either 0 or textNode.content.length - 1
         if (destination.index == 0 || destination.index == textNode.content.length) {
@@ -626,14 +675,21 @@ class DocumentOperator {
             // Check if destination is firstLeading of relevant format node:
             const firstLeadingFromFormatNode = this.firstLeading(pathToRelevantFormatNode);
             if (documentVectorsAreDeeplyEqual(destination, firstLeadingFromFormatNode)) {
-                // Delete textNode if textNode has no content
-                if (textNode.content.length == 0) {
-                    console.log('Deleting textNode');
-                }
                 // We want to INSERT BEFORE relevant format node.
-                console.log('Insert before!');
-                // Placeholder of relative path to generated textNode:
-                const textNodePath: number[] = []
+                // Generate textObject nested in appropriate formatObjects, filter out format that is being undone
+                const { node, textNodePath } = generateNestedTextObject(this.state.getSelectionFormatsArray().filter(originalFormat => originalFormat !== format));
+
+                // Purge formatNode for emptyChildren:
+                const { purgedNode, removedOrigin } = this.purgeNodeForEmptyTextNodes(pathToRelevantFormatNode);
+                if (purgedNode == null) {
+                    relevantFormatNodeParentNode.children.splice(indexOfFormatInParentArray, 1, node);
+                } else {
+                    if (documentNodeIsParagraphNode(purgedNode)) {
+                        throw new Error('Purged format node was returned as ParagraphObject');
+                    }
+                    relevantFormatNodeParentNode.children.splice(indexOfFormatInParentArray, 1, node, purgedNode);
+                }
+                
                 // Resulting vector must be the path to the format node
                 return { path: [...pathToRelevantFormatNode, ...textNodePath], index: 0 };
             }
@@ -641,16 +697,30 @@ class DocumentOperator {
             // Check if destination is lastTrailing of relevant format node:
             const lastTrailingFromFormatNode = this.lastTrailing(pathToRelevantFormatNode);
             if (documentVectorsAreDeeplyEqual(destination, lastTrailingFromFormatNode)) {
-                // Delete textNode if textNode has no content...
-                if (textNode.content.length == 0) {
-                    console.log('Deleting textNode');
+                // Get formats, that the relevantFormatNode itself is nested in.
+                const formatsOfFormatNode = this.getFormatsArrayOfNode(pathToRelevantFormatNode);
+
+                // Generate textObject nested in appropriate formatObjects, filter out format that is being undone ans formats of relevant format node.
+                const { node, textNodePath } = generateNestedTextObject(this.state.getSelectionFormatsArray().filter(originalFormat => !formatsOfFormatNode.concat(format).includes(originalFormat)));
+
+                // Purge formatNode for emptyChildren:
+                const { purgedNode, removedOrigin } = this.purgeNodeForEmptyTextNodes(pathToRelevantFormatNode);
+                if (purgedNode == null) {
+                    // Insert textNode
+                    relevantFormatNodeParentNode.children.splice(indexOfFormatInParentArray, 1, node);
+                    // Resulting vector must be the path of the format node with last index + 1
+                    return { path: [...pathToRelevantFormatNode, ...textNodePath], index: 0 };
+                } else {
+                    if (documentNodeIsParagraphNode(purgedNode)) {
+                        throw new Error('Purged format node was returned as ParagraphObject');
+                    }
+                    // Insert textNode
+                    relevantFormatNodeParentNode.children.splice(indexOfFormatInParentArray, 1, purgedNode, node);
+                    // Resulting vector must be the path of the format node with last index + 1
+                    return { path: [...pathToRelevantFormatNode.slice(0, -1), pathToRelevantFormatNode[pathToRelevantFormatNode.length - 1] + 1, ...textNodePath], index: 0 }
                 }
-                // We want to INSERT AFTER relevant format node.
-                console.log('Insert after!');
-                // Placeholder of relative path to generated textNode:
-                const textNodePath: number[] = []
-                // Resulting vector must be the path of the format node with last index + 1
-                return { path: [...pathToRelevantFormatNode.slice(0, -1), pathToRelevantFormatNode[pathToRelevantFormatNode.length - 1], ...textNodePath], index: 0 }
+
+                
             }
 
         }
@@ -658,10 +728,11 @@ class DocumentOperator {
         // If we have not returned we did neither INSERT BEFORE nor INSERT AFTER, we in this case need to split relevantFormatNode along the destination vector.
         const { firstSplit, lastSplit } = this.splitNodeAlongVector(destination, pathToRelevantFormatNode);
 
-        // We generate a textObject nested in appropriate formatObjects, filter out format that is being undone
-        const { node, textNodePath } = generateNestedTextObject(this.state.getSelectionFormatsArray().filter(originalFormat => originalFormat !== format));
+        // Get formats, that the relevantFormatNode itself is nested in.
+        const formatsOfFormatNode = this.getFormatsArrayOfNode(pathToRelevantFormatNode);
 
-        const indexOfFormatInParentArray = getIndexOfChildInParentChildrenArray(relevantFormatNodeParentNode, relevantFormatNode);
+        // Generate textObject nested in appropriate formatObjects, filter out format that is being undone ans formats of relevant format node.
+        const { node, textNodePath } = generateNestedTextObject(this.state.getSelectionFormatsArray().filter(originalFormat => !formatsOfFormatNode.concat(format).includes(originalFormat)));
 
         // Handle paragraph splitting
         if (documentNodeIsParagraphNode(firstSplit) || documentNodeIsParagraphNode(lastSplit)) {
@@ -674,134 +745,6 @@ class DocumentOperator {
 
         return { path: [...pathToRelevantFormatNode.slice(0, -1), pathToRelevantFormatNode[pathToRelevantFormatNode.length - 1] + 1, ...textNodePath], index: 0 }
 
-
-    }
-
-    public undoFormat(destination: DocumentVector, format: format): DocumentVector {
-
-        // ISSUES WITH THIS FUNCTION:
-
-        // Immediate parent of the textNode must be a format node, but no nescesarily the format node that we intent to undo...
-        // The function does not take this into account. It essentialy doesn't take into account scenarios other than that,
-        // when the immediate parentNode is the desired formatNode.
-
-        // This must be fixed... The document structure must be traversed until the relevant format node is found.
-
-        // Path to this format note must be remembered.
-
-        // SCENARIOS:
-
-        // INSERT TEXTNODE BEFORE - This scenario is only applicable if the destination vector is equal to the firstLeading vector from the relevant formatNode...
-        // INSERT TEXTNODE AFTER - On the contrary, this is only applicable if the destination vector is equal to the lastTrailing vector from the relevant formatNode...
-        // These actions must take into account the allready applied styles, as read in the State class, when creating the new, empty textnode.
-        // Textnode might be nested in other format nodes.
-
-        // ALL OTHER SCENARIOS REQUIRES SPLITTING THE FORMAT NODE:
-        // **** General function to split a node along a document vector should be created.
-        // **** General function to generate a textNode nested within relevant style should be created. 
-        //      This function should return the formatNode or textNode, and a relative path to the generated node.
-
-        // REPLACE TEXT NODE - If the textNode.content.length == 0, the textNode should be deleted.
-        
-        // If the index is at an endpoint of the content of the textNode, what should the course of action be here?
-        // It should avoid splitting the textNode itself... Maybe the general split-function, should purge everything, that only contains empyt-text.nodes...
-        // That way the textNode could be split in all scenraios, YES!!!
-
-        const textNode: TextObject = this.getTextNode(destination);
-        const formatNode = this.getNodeByPath(destination.path.slice(0, -1));
-        if (!documentNodeIsFormatNode(formatNode)) {
-            throw new Error('Text node parent was not a format node.');
-        }
-        const formatParentNode = this.getNodeByPath(destination.path.slice(0, -2));
-
-        if (!documentNodeHasChildren(formatParentNode)) {
-            throw new Error(`formatParentNode node of destination node had no children...`);
-        }
-        if (!indexIsValid(destination.index, 0, textNode.content.length)) {
-            throw new Error(`Invalid index in destination.index of ${destination.index}`);
-        }
-
-        const indexOfTextInFormatChildrenArray = getIndexOfChildInParentChildrenArray(formatNode, textNode);
-        const indexOfFormatInParentArray = getIndexOfChildInParentChildrenArray(formatParentNode, formatNode);
-        const textObject = generateTextObject();
-
-        let returnVector: DocumentVector;
-
-        const replace = () => {
-
-            // Delete textNode from formatNode.children
-            formatNode.children.splice(indexOfTextInFormatChildrenArray, 1);
-            formatParentNode.children.splice(indexOfFormatInParentArray, 1, textObject, ...formatNode.children);
-
-            // Join adjacent text-nodes in formatParentNode.children
-            let i = 0;
-            while(i < formatParentNode.children.length - 1) {
-                
-                const current = formatParentNode.children[i];
-                const next = formatParentNode.children[i + 1];
-
-                // If either of the nodes are undefined, break the loop.
-                if (!(current && next)) {
-                    break;
-                }
-
-                if ((documentNodeIsTextNode(current) && documentNodeIsTextNode(next))) {
-                    current.content += next.content;
-                    formatParentNode.children.splice(i + 1, 1);
-                } else {
-                    i++;
-                }
-
-            }
-
-        }
-
-        const replaceNested = () => {
-            console.log('Hi!');
-        }
-
-        const insertBefore = () => {
-            formatParentNode.children.splice(indexOfFormatInParentArray, 0, textObject);
-        }
-
-        const insertAfter = () => {
-            formatParentNode.children.splice(indexOfFormatInParentArray+1, 0 , textObject);
-        }
-
-        const insertInto = () => {
-
-        }
-
-        // Different textNode scenarios:
-        console.log('Text node content: ', textNode.content);
-        if (textNode.content.length == 0) {
-
-            // If formatNode has multiple children, we do not want to delete it, rather, only delete the text-node, that we are in.
-            if (formatNode.children.length == 1) {
-                console.log('Replaceing format node');
-                replace();
-                returnVector = { path: [...destination.path.slice(0, -2), 0], index: 0 }
-            } else {
-                console.log('Removing text-node');
-                returnVector = this.replaceNestedFormatTextNode(destination, format, textNode, formatNode, formatParentNode);
-            }
-
-
-        } else if (destination.index == 0) {
-            console.log('Inserting before format node');
-            insertBefore();
-            returnVector = { path: [...destination.path.slice(0, -2), 0], index: 0}
-        } else if (destination.index == textNode.content.length) {
-            console.log('Inserting after format node');
-            insertAfter();
-            returnVector = { path: [...destination.path.slice(0, -2), indexOfFormatInParentArray + 1], index: 0 }
-        } else {
-            console.log('Insert into!');
-            insertInto();
-            returnVector = { path: [...destination.path, 0], index: 0 }
-        }
-
-        return returnVector;
 
     }
 
@@ -939,6 +882,22 @@ class DocumentOperator {
         }
 
         return destinationFormats;
+
+    }
+
+    // Function returns an array of formats that the node pointed to by the path is nested in.
+    private getFormatsArrayOfNode(path: number[]): format[] {
+
+        const formats: format[] = [];
+
+        for (let i = 1; i < path.length; i++) {
+            const node = this.getNodeByPath(path.slice(0, -i));
+            if (documentNodeIsFormatNode(node)) {
+                formats.push(node.format);
+            }
+        }
+
+        return formats;
 
     }
 

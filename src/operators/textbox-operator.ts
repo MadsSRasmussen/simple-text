@@ -151,7 +151,7 @@ class TextboxOperator {
     public format(format: format) {
         
         if (this.state.selectionFormats[format] == true) {
-            this.state.cursor = this.documentOperator.undoFormatRewrite(this.state.cursor, format);
+            this.state.cursor = this.documentOperator.undoFormat(this.state.cursor, format);
         } else {
             this.state.cursor = this.documentOperator.insertFormat(this.state.cursor, format);
         }

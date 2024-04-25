@@ -132,6 +132,15 @@ class TextboxOperator {
 
     // Inserts paragraph
     public insertParagraph(): void {
+
+        if (this.state.selectionRange) {
+
+            const { newVector, latestChangedPath } = this.documentOperator.removeSelection(this.state.selectionRange);
+            this.state.cursor = newVector;
+            this.state.selectionRange = null;
+
+        }
+
         this.state.cursor = this.documentOperator.insertParagraph(this.state.cursor);
         this.domRenderer.render();
         this.updateCarret();

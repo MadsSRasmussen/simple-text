@@ -1,13 +1,11 @@
 import Document from "../models/document-model.js";
 import { documentNodeIsTextNode, documentNodeIsFormatNode, documentNodeHasChildren, indexIsValid, documentNodeIsLastTextNodeOfParagraph, documentNodeIsFirstTextNodeOfParagraph, documentNodeIsParagraphNode } from "../utils/guards.js";
 import { DocumentVector, ParagraphObject, FormatObject, TextObject } from "../types.js";
-import type { FormatFlags, format } from "../types.js";
+import type { FormatFlags, SelectionRange, format } from "../types.js";
 import { generateFormatObject, generateTextObject, generateFormatFlagsObject, getIndexOfChildInParentChildrenArray, documentVectorsAreDeeplyEqual, arraysAreDeeplyEqual, generateNestedTextObject } from "../utils/helpers/document.js";
 import TextboxState from "../core/textbox-state.js";
-import { collapseTextChangeRangesAcrossMultipleVersions } from "../../node_modules/typescript/lib/typescript.js";
 
-// Class to handle document related operations.
-// Class only deals with data layer.
+// Class to handle document related operations in the data-layer
 class DocumentOperator {
 
     private document: Document;
@@ -337,7 +335,7 @@ class DocumentOperator {
         if (!(documentNodeIsParagraphNode(firstSplit) && documentNodeIsParagraphNode(lastSplit))) {
             throw new Error('Splits of insertParagraph were not both of type ParagraphObject');
         }
-        
+
         this.document.paragraphs.splice(indexOfParagraph, 1, firstSplit, lastSplit);
 
         return this.firstLeading([indexOfParagraph + 1]);
@@ -403,6 +401,82 @@ class DocumentOperator {
         function replace(parentNode: ParagraphObject | FormatObject, nodeToInsert: TextObject, indexOfChild: number): void {
             parentNode.children[indexOfChild] = formatObject;
         }
+
+    }
+
+    private getLongestIdenticalPath(firstVector: DocumentVector, lastVector: DocumentVector): number[] {
+
+        const path: number[] = [];
+
+        const shortestPath = firstVector.path.length > lastVector.path.length ? lastVector.path : firstVector.path;
+        const longestPath = firstVector.path.length > lastVector.path.length ? firstVector.path : lastVector.path;
+
+        for (let i = 0; i < shortestPath.length; i++) {
+
+            if (shortestPath[i] !== longestPath[i]) {
+                break;
+            }
+
+            path.push(shortestPath[i]);
+
+        }
+
+        return path;
+
+    }
+
+    public removeSelection(range: SelectionRange): { newVector: DocumentVector, latestChangedPath: number[] } {
+
+        const longestIdenticalPath = this.getLongestIdenticalPath(range.start, range.end);
+        // Remove within paragraph node:
+        if (longestIdenticalPath.length > 0) {
+
+            const node = this.getNodeByPath(longestIdenticalPath);
+
+            const firstSplit = this.assembleBranchFromFirstLeadingToVector(longestIdenticalPath, range.start);
+            const lastSplit = this.assembleBranchFromVectorToLastTrailing(longestIdenticalPath, range.end);
+
+            if (documentNodeIsTextNode(node)) {
+
+                if (!(documentNodeIsTextNode(firstSplit) && documentNodeIsTextNode(lastSplit))) {
+                    throw new Error('Splits were of TextObject were not both of type TextObject')
+                }
+
+                const parentNode = this.getNodeByPath(longestIdenticalPath.slice(0, -1));
+                if (documentNodeIsTextNode(parentNode)) {
+                    throw new Error('Parent node was of type TextObject');
+                }
+                const indexOfChildInParentNode = getIndexOfChildInParentChildrenArray(parentNode, node);
+
+                const mergedTextNode = generateTextObject(`${firstSplit.content}${lastSplit.content}`);
+
+                parentNode.children.splice(indexOfChildInParentNode, 1, mergedTextNode);
+
+                const newVector: DocumentVector = {
+                    path: longestIdenticalPath,
+                    index: firstSplit.content.length
+                }
+
+                return { newVector: newVector, latestChangedPath: longestIdenticalPath };
+
+            }
+
+            const newChildren: [TextObject | FormatObject, ...(TextObject | FormatObject)[]] = documentNodeHasChildren(firstSplit) ? [...firstSplit.children] : [firstSplit];
+            const indexOfLastChildOfFirstSplit = documentNodeHasChildren(firstSplit) ? firstSplit.children.length - 1 : 0;
+
+            if (documentNodeHasChildren(lastSplit)) {
+                newChildren.splice(newChildren.length, 0, ...lastSplit.children);
+            } else {
+                newChildren.splice(newChildren.length, 0, lastSplit);
+            }
+
+            node.children = newChildren;
+
+            return { newVector: this.lastTrailing([...longestIdenticalPath, indexOfLastChildOfFirstSplit]), latestChangedPath: longestIdenticalPath };
+
+        }
+
+        throw new Error('Cannot delete selection accross multiple paragraphs!');
 
     }
 

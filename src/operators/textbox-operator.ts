@@ -140,11 +140,25 @@ class TextboxOperator {
     // Deletes character or paragraph depending on state.cursor.index
     public backspace(): void {
 
-        const deleteResult = this.documentOperator.deleteSingle(this.state.cursor);
-        this.state.cursor = deleteResult.newVector;
-        this.domRenderer.renderFromPath(deleteResult.latestChangedPath);
-        this.updateCarret();
-        return;
+        if (this.state.selectionRange) {
+
+            const { newVector, latestChangedPath } = this.documentOperator.removeSelection(this.state.selectionRange);
+            this.state.cursor = newVector;
+            this.state.selectionRange = null;
+            this.domRenderer.renderFromPath(latestChangedPath);
+            this.updateCarret();
+            return;
+
+        } else {
+            
+            const { newVector, latestChangedPath } = this.documentOperator.deleteSingle(this.state.cursor);
+            this.state.cursor = newVector;
+            this.domRenderer.renderFromPath(latestChangedPath);
+            this.updateCarret();
+            return;
+        
+        }
+
 
     }
 

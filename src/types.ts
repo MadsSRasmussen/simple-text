@@ -28,7 +28,7 @@ export interface DocumentVector {
 
 export interface CarretPosition {
     x: number,
-    y: number;
+    y: number,
 }
 
 export interface SelectionRange {

@@ -327,34 +327,20 @@ class DocumentOperator {
 
     }
 
-    public insertParagraph(destination: DocumentVector): DocumentVector {
+    public insertParagraph(desintaion: DocumentVector): DocumentVector {
 
-        const textNode: TextObject = this.getTextNode(destination);
+        const indexOfParagraph = desintaion.path[0]
 
-        // Check that index is between 0 and textNode.content.length;
-        if (!indexIsValid(destination.index, 0, textNode.content.length)) {
-            throw new Error(`Invalid index in destination.index of ${destination.index}`);
+        // Split paragraphNode:
+        const { firstSplit, lastSplit } = this.splitNodeAlongVector(desintaion, [indexOfParagraph]);
+
+        if (!(documentNodeIsParagraphNode(firstSplit) && documentNodeIsParagraphNode(lastSplit))) {
+            throw new Error('Splits of insertParagraph were not both of type ParagraphObject');
         }
+        
+        this.document.paragraphs.splice(indexOfParagraph, 1, firstSplit, lastSplit);
 
-        const firstBit = textNode.content.substring(0, destination.index);
-        const lastBit = textNode.content.substring(destination.index);
-
-        // Set contents of original textNode to firstBit
-        textNode.content = firstBit;
-
-        const paragraph: ParagraphObject = {
-            type: 'paragraph',
-            children: [{
-                type: 'text',
-                content: lastBit
-            }]
-        }
-
-        // Create new paragraph with textNode of lastBit, no style handeling for now...
-        this.document.paragraphs = [...this.document.paragraphs.slice(0, destination.path[0] + 1), paragraph, ...this.document.paragraphs.slice(destination.path[0] + 1)];
-
-        const returnVector = { path: [destination.path[0] + 1, 0], index: 0 };
-        return returnVector;
+        return this.firstLeading([indexOfParagraph + 1]);
 
     }
     

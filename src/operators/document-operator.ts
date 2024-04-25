@@ -241,7 +241,8 @@ class DocumentOperator {
     }
     
     public getNodeByPath(path: number[]): ParagraphObject | FormatObject | TextObject {
-        
+
+
         let node: ParagraphObject | FormatObject | TextObject  = this.document.paragraphs[path[0]];
         
         for (let i = 1; i < path.length; i++) {
@@ -745,10 +746,77 @@ class DocumentOperator {
 
         relevantFormatNodeParentNode.children.splice(indexOfFormatInParentArray, 1, firstSplit, node, lastSplit);
 
-        const newPath = [...pathToRelevantFormatNode.slice(0, -1), pathToRelevantFormatNode[pathToRelevantFormatNode.length - 1] + 1, ...textNodePath];
+        // Path to splits - these must be replaced with 
+        const pathToFirstSplit = [...pathToRelevantFormatNode];
+        const pathToLastSplit = [...pathToRelevantFormatNode.slice(0, -1), pathToRelevantFormatNode[pathToRelevantFormatNode.length - 1] + 2];
 
-        return { path: [...pathToRelevantFormatNode.slice(0, -1), pathToRelevantFormatNode[pathToRelevantFormatNode.length - 1] + 1, ...textNodePath], index: 0 }
+        const { purgedNode: firstSplitPurgedNode , removedOrigin: removedOriginFirstSplit } = this.purgeNodeForEmptyTextNodes(pathToFirstSplit);
+        const { purgedNode: lastSplitPurgedNode , removedOrigin: removedOriginLastSplit } = this.purgeNodeForEmptyTextNodes(pathToLastSplit);
 
+        // If both purgedNodes existst, replac each split with its purged node
+        if (firstSplitPurgedNode && lastSplitPurgedNode) {
+
+            if (documentNodeIsParagraphNode(firstSplitPurgedNode) || documentNodeIsParagraphNode(lastSplitPurgedNode)) {
+                throw new Error('A purgedNode to be inserted as a child was a ParagraphObject');
+            }
+            
+            // Replace firstSplit
+            relevantFormatNodeParentNode.children.splice(indexOfFormatInParentArray, 1, firstSplitPurgedNode);
+
+            // Replace lastSplit
+            relevantFormatNodeParentNode.children.splice(indexOfFormatInParentArray + 2, 1, lastSplitPurgedNode);
+
+            return { path: [...pathToRelevantFormatNode.slice(0, -1), pathToRelevantFormatNode[pathToRelevantFormatNode.length - 1] + 1, ...textNodePath], index: 0 }
+        }
+
+        // If only firstPurgedNode exists
+        if (firstSplitPurgedNode) {
+
+            if (documentNodeIsParagraphNode(firstSplitPurgedNode)) {
+                throw new Error('A purgedNode to be inserted as a child was a ParagraphObject');
+            }
+
+            // Replace firstSplit
+            relevantFormatNodeParentNode.children.splice(indexOfFormatInParentArray, 1, firstSplitPurgedNode);
+
+            // Remove lastSplit
+            relevantFormatNodeParentNode.children.splice(indexOfFormatInParentArray + 2, 1);
+
+            return { path: [...pathToRelevantFormatNode.slice(0, -1), pathToRelevantFormatNode[pathToRelevantFormatNode.length - 1] + 1, ...textNodePath], index: 0 }
+
+        }
+
+        // If only lastPurgedNode exists
+        if (lastSplitPurgedNode) {
+
+            if (documentNodeIsParagraphNode(lastSplitPurgedNode)) {
+                throw new Error('A purgedNode to be inserted as a child was a ParagraphObject');
+            }
+
+            // Insert lastSplit
+            relevantFormatNodeParentNode.children.splice(indexOfFormatInParentArray + 2, 1, lastSplitPurgedNode);
+
+            // Delete firstSplit
+            relevantFormatNodeParentNode.children.splice(indexOfFormatInParentArray, 1);
+
+            return { path: [...pathToRelevantFormatNode, ...textNodePath], index: 0 }
+
+        }
+
+        // Neither node exists
+        if (!(firstSplitPurgedNode || lastSplitPurgedNode)) {
+
+            // Delete lastSplit
+            relevantFormatNodeParentNode.children.splice(indexOfFormatInParentArray + 2, 1);
+
+            // Delete firstSplit
+            relevantFormatNodeParentNode.children.splice(indexOfFormatInParentArray, 1);
+
+            return { path: [...pathToRelevantFormatNode, ...textNodePath], index: 0 }
+
+        }
+
+        throw new Error('Unsupported scenario in undoFormat -- split');
 
     }
 

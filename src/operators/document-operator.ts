@@ -99,10 +99,15 @@ class DocumentOperator {
 
         }
 
+        // If vector is equal to the first leading vector in the entire document, return
+        if (documentVectorsAreDeeplyEqual(this.firstLeading([0]), vector)) {
+            return vector;
+        }
+
         // Recursive function: 1 generation up - check if path is > 0, if it is, continue along this path with max-index, values, until text-node is reached.
         const copiedPath = [...vector.path];
 
-        const test = (path: number[]): DocumentVector => {
+        const findImmediateTrailingVector = (path: number[]): DocumentVector => {
 
             if (path[path.length - 1] > 0) {
                 const localPath = [...path];
@@ -115,12 +120,12 @@ class DocumentOperator {
                     throw new Error(`Unable to find previous vector`);
                 }
                 path.pop();
-                return test(path)
+                return findImmediateTrailingVector(path)
             }
 
         }
 
-        const returnVector = test(copiedPath);
+        const returnVector = findImmediateTrailingVector(copiedPath);
         return returnVector;
 
     }
@@ -180,6 +185,11 @@ class DocumentOperator {
         if (indexIsValid(vector.index + 1, 0, textNode.content.length)) {
             const returnVector = { path: [...vector.path], index: vector.index + 1};
             return returnVector;
+        }
+
+        // If vector is equal to the first leading vector in the entire document, return
+        if (documentVectorsAreDeeplyEqual(this.lastTrailing([this.document.paragraphs.length - 1]), vector)) {
+            return vector;
         }
     
         const copiedPath = [...vector.path];

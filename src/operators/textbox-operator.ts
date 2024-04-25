@@ -109,16 +109,32 @@ class TextboxOperator {
 
     }
 
+    // Collapses DOM - Range if any is present
+    private removeSelection() {
+
+        const selection = window.getSelection();
+        const range = selection?.getRangeAt(0);
+
+        if (range) {
+            range.collapse();
+        }
+
+    }
+
     public hideCarret(): void {
         this.carret.hide();
     }
 
     public moveCarretLeft(): void {
+        this.state.selectionRange = null;
+        this.removeSelection();
         this.state.cursor = this.documentOperator.getPreviousVector(this.state.cursor);
         this.updateCarret();
     }
 
     public moveCarretRight(): void {
+        this.state.selectionRange = null;
+        this.removeSelection();
         this.state.cursor = this.documentOperator.getNextVector(this.state.cursor);
         this.updateCarret();
     }

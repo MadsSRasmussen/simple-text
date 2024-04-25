@@ -685,7 +685,6 @@ class DocumentOperator {
 
                 // Purge formatNode for emptyChildren:
                 const { purgedNode, removedOrigin } = this.purgeNodeForEmptyTextNodes(pathToRelevantFormatNode);
-                console.log(purgedNode);
                 if (purgedNode == null) {
                     relevantFormatNodeParentNode.children.splice(indexOfFormatInParentArray, 1, node);
                 } else {
@@ -750,66 +749,6 @@ class DocumentOperator {
 
         return { path: [...pathToRelevantFormatNode.slice(0, -1), pathToRelevantFormatNode[pathToRelevantFormatNode.length - 1] + 1, ...textNodePath], index: 0 }
 
-
-    }
-
-    private replaceNestedFormatTextNode(destination: DocumentVector, format: format, textNode: TextObject, formatNode: FormatObject, formatParentNode: ParagraphObject | FormatObject): DocumentVector {
-
-        // Function is only called, when formatArray has more than 1 child...
-
-        const indexOfTextInFormatChildrenArray = getIndexOfChildInParentChildrenArray(formatNode, textNode);
-        const indexOfFormatInParentArray = getIndexOfChildInParentChildrenArray(formatParentNode, formatNode);
-        const textObject = generateTextObject();
-
-        // 3 scenarios of insertion of new empty text-node:
-
-        // Insert before
-        if (indexOfTextInFormatChildrenArray == 0) {
-
-            // Delete textNode in formatNode.children
-            formatNode.children.splice(indexOfTextInFormatChildrenArray, 1);
-
-            // Place new empty textNode before indexOfFormatInParentArray in formatParentNode
-            formatParentNode.children.splice(indexOfFormatInParentArray, 0, textObject);
-
-            // Vector modification of path must be splice(0, -1) -> With an index of zero
-            return { path: [...destination.path.slice(0, -1)], index: 0 };
-            
-
-        // Insert after
-        } else if (indexOfTextInFormatChildrenArray == formatNode.children.length - 1) {
-
-            // Delete textNode in formatNode.children
-            formatNode.children.splice(indexOfTextInFormatChildrenArray, 1);
-
-            // Place after indexOfFormatInParentArray in formatParentNode
-            formatParentNode.children.splice(indexOfFormatInParentArray + 1, 0, textObject);
-
-            // Vector modification of path must be splice(0, -2), indexOfFormatInParentArray + 1 -> With an index of zero:
-            return { path: [...destination.path.slice(0, -2), indexOfFormatInParentArray + 1], index: 0 };
-
-        // Insert into
-        } else {
-
-            // Split children of formatNode:
-            const childrenBeforeTextNode = formatNode.children.slice(1, indexOfTextInFormatChildrenArray);
-            const childrenAfterTextNode = formatNode.children.slice(indexOfTextInFormatChildrenArray + 2);
-
-            // Generate new format nodes and set children accordingly.
-            const firstFormatNode = generateFormatObject(format)
-            firstFormatNode.children = [formatNode.children[0], ...childrenBeforeTextNode];
-            const lastFormatNode = generateFormatObject(format)
-            lastFormatNode.children = [formatNode.children[indexOfTextInFormatChildrenArray + 1], ...childrenAfterTextNode];
-
-            formatParentNode.children.splice(indexOfFormatInParentArray, 1, firstFormatNode, textObject, lastFormatNode);
-
-            console.log(formatParentNode);
-
-            // Vector modification of path must be splice(0, -2), indexOfFormatNodeInParentNodeChildrenArray + 1 -> With an index of zero.
-            return { path: [...destination.path.slice(0, -2), indexOfFormatInParentArray + 1], index: 0 }
-
-        }
-        
 
     }
 

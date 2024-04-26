@@ -24,9 +24,15 @@
     height: calc(var(--font-size) + 2px);
     position: absolute;
     animation: blink 1s step-start infinite;
+    pointer-events: none;
 }
 
 .textBox p {
     min-height: var(--font-size);
     width: fit-content;
+}
+
+.textbox-paragraph-element {
+    width: fit-content;
+    min-height: var(--font-size);
 }

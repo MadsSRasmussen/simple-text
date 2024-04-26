@@ -45,7 +45,6 @@ class TextboxInputHandler {
         this.textboxOperator.updateSelectionState(selection);
         this.textboxOperator.updateCarret();
 
-
     };
 
     private keydownHandler(e: KeyboardEvent) {

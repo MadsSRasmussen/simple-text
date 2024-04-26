@@ -1,4 +1,5 @@
-import { DocumentVector, FormatFlags, FormatObject, ParagraphObject, TextObject, format } from "../../types";
+import { DocumentVector, FormatFlags, FormatObject, ParagraphObject, TextObject, format } from "../../types.js";
+import { documentNodeIsFormatNode, documentNodeIsParagraphNode, documentNodeIsTextNode } from "../guards.js";
 
 export function generateTextObject(content: string = ''): TextObject {
 
@@ -78,10 +79,55 @@ export function generateNestedTextObject(formats: format[], content: string = ''
 
 }
 
-function generateFormatObjectWithChild(child: TextObject | FormatObject, format: format): FormatObject {
+function generateFormatObjectWithChild(child: TextObject | FormatObject, format: format): FormatObject {
     return {
         type: 'format',
         format: format,
         children: [child]
     }
+}
+
+export function getSubNodeInNode(node: ParagraphObject | FormatObject, path: number[]): TextObject | FormatObject | ParagraphObject {
+
+    let currentNode: ParagraphObject | FormatObject | TextObject = node;
+
+    for (let i = 0; i < path.length; i++) {
+
+        if (documentNodeIsTextNode(currentNode)) {
+            if (i !== path.length - 1) {
+                throw new Error('TextObject encountered before the end of path');
+            }
+            console.log('breaking')
+            break;
+        }
+
+        if (currentNode.children.length - 1 < path[i]) {
+            throw new Error('Invalid child index');
+        }
+
+        currentNode = currentNode.children[path[i]]
+
+    }
+
+    if (currentNode == undefined) {
+        throw new Error('Resulting node was undefined...');
+    }
+
+    return currentNode;
+
+}
+
+export function getFomrtasArrayOfNodeInSubNode(rootNode: ParagraphObject | FormatObject, pathToSubNode: number[]): format[] {
+
+    const formats: format[] = [];
+
+    for (let i = 0; i < pathToSubNode.length; i++) {
+        const node = getSubNodeInNode(rootNode, pathToSubNode.slice(0, -i));
+        if (documentNodeIsFormatNode(node)) {
+            formats.push(node.format);
+        }
+    }
+
+    return formats;
+
 }

@@ -61,7 +61,8 @@ class DomRenderer {
     private generateParagraphElement(paragraph: ParagraphObject): HTMLElement {
 
         // The html paragraph element
-        const paragraphElement = document.createElement('p');
+        const paragraphElement = document.createElement('div');
+        paragraphElement.classList.add('textbox-paragraph-element');
 
         paragraph.children.forEach(child => {
 

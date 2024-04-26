@@ -2,7 +2,7 @@ import Document from "../models/document-model.js";
 import { documentNodeIsTextNode, documentNodeIsFormatNode, documentNodeHasChildren, indexIsValid, documentNodeIsLastTextNodeOfParagraph, documentNodeIsFirstTextNodeOfParagraph, documentNodeIsParagraphNode } from "../utils/guards.js";
 import { DocumentVector, ParagraphObject, FormatObject, TextObject } from "../types.js";
 import type { FormatFlags, SelectionRange, format } from "../types.js";
-import { generateFormatObject, generateTextObject, generateFormatFlagsObject, getIndexOfChildInParentChildrenArray, documentVectorsAreDeeplyEqual, arraysAreDeeplyEqual, generateNestedTextObject } from "../utils/helpers/document.js";
+import { generateFormatObject, generateTextObject, generateFormatFlagsObject, getIndexOfChildInParentChildrenArray, documentVectorsAreDeeplyEqual, arraysAreDeeplyEqual, generateNestedTextObject, getSubNodeInNode, getFomrtasArrayOfNodeInSubNode } from "../utils/helpers/document.js";
 import TextboxState from "../core/textbox-state.js";
 
 // Class to handle document related operations in the data-layer
@@ -654,6 +654,120 @@ class DocumentOperator {
         return generateBranch(pathToStartingNode);
 
     }
+
+    // Returnes a subBranch from node at pathToStartingNode, including all nodes between startVector and endVector
+    private assembleBranchFromVectorToVector(pathToStartingNode: number[], startVector: DocumentVector, endVector: DocumentVector): TextObject | FormatObject | ParagraphObject {
+
+        const identicalPaths = arraysAreDeeplyEqual(startVector.path, endVector.path);
+
+        const generateBranch = (path: number[]): TextObject | FormatObject | ParagraphObject => {
+
+            // Get the node to create the branch below of:
+            const node = this.getNodeByPath(path);
+
+            // Basecase - textNode:
+            if (documentNodeIsTextNode(node)) {
+
+                // Both vectors point so same end-node:
+                if (identicalPaths) {
+                    // Check validity of indexies:
+                    if (!(indexIsValid(startVector.index, 0, node.content.length) && indexIsValid(endVector.index, 0, node.content.length))) {
+                        throw new Error('Invalid index of startVector or endVector');
+                    }
+                    return { ...node, content: node.content.substring(startVector.index, endVector.index) }
+                }
+
+                // Textnode on startingVector
+                if (arraysAreDeeplyEqual(path, startVector.path)) {
+                    if (!indexIsValid(startVector.index, 0, node.content.length)) {
+                        throw new Error('Invalid index of startVector');
+                    }
+                    return { ...node, content: node.content.substring(startVector.index) }
+                }
+
+                // Textnode on endVector
+                if (arraysAreDeeplyEqual(path, endVector.path)) {
+                    if (!indexIsValid(endVector.index, 0, node.content.length)) {
+                        throw new Error('Invalid index of endVector');
+                    }
+                    return { ...node, content: node.content.substring(0, endVector.index) };
+                }
+
+                // Default case: Textnode between vectors:
+                return node;
+
+            }
+
+            // If neither startVector.path nor endVector.path are equal to current path, we must be between the vectors per the for-loop-logic below...
+            if (!(arraysAreDeeplyEqual(path, startVector.path.slice(0, path.length)) || arraysAreDeeplyEqual(path, endVector.path.slice(0, path.length)))) {
+                return node;
+            }
+
+            // If the vector paths are equal so far, we include children between the two indicies
+            if (arraysAreDeeplyEqual(startVector.path.slice(0, path.length), endVector.path.slice(0, path.length))) {
+
+                const nodeChildren: [(FormatObject | TextObject), ...(FormatObject | TextObject)[]] = [node.children[startVector.path[path.length]]];
+                const indexOfFirstChild = startVector.path[path.length];
+                const indexOfLastChild = endVector.path[path.length];
+
+                for (let i = indexOfFirstChild; i < indexOfLastChild + 1; i++) {
+                    const child = generateBranch([...path, i]);
+                    if (child.type == 'paragraph') {
+                        throw new Error('ParagraphObject was returned as child');
+                    }
+                    nodeChildren[i - indexOfFirstChild] = child;
+                }
+
+                return { ...node, children: nodeChildren };
+
+            }
+
+            // If only startVector.path is equal so far, we include all children after the vector:
+            if (arraysAreDeeplyEqual(path, startVector.path.slice(0, path.length))) {
+
+                const nodeChildren: [(FormatObject | TextObject), ...(FormatObject | TextObject)[]] = [node.children[node.children.length - 1]];
+                const indexOfFirstChild = startVector.path[path.length];
+    
+                for (let i = indexOfFirstChild; i < node.children.length; i++) {
+    
+                    const child = generateBranch([...path, i]);
+                    if (child.type == 'paragraph') {
+                        throw new Error('ParagraphObject was returned as child');
+                    }
+                    nodeChildren[i - indexOfFirstChild] = child;
+    
+                }
+    
+                return { ...node, children: nodeChildren };
+
+            }
+
+            if (arraysAreDeeplyEqual(path, endVector.path.slice(0, path.length))) {
+
+                const nodeChildren: [(FormatObject | TextObject), ...(FormatObject | TextObject)[]] = [node.children[0]];
+                const numberOfChildrenAtPointInBranch = endVector.path[path.length] + 1;
+    
+                for (let i = 0; i < numberOfChildrenAtPointInBranch; i++) {
+    
+                    const child = generateBranch([...path, i]);
+                    if (child.type == 'paragraph') {
+                        throw new Error('ParagraphObject was returned as child');
+                    }
+                    nodeChildren[i] = child;
+    
+                }
+    
+                return { ...node, children: nodeChildren };
+
+            }
+
+            throw new Error('Generate branch function reached unsupported state');
+
+        }
+
+        return generateBranch(pathToStartingNode);
+
+    }
     
     // Function to split a node along a DocumentVector. Function also purges objects, that only contains empty textNodes.
     private splitNodeAlongVector(vector: DocumentVector, path: number[]): { firstSplit: ParagraphObject | FormatObject | TextObject, lastSplit: ParagraphObject | FormatObject | TextObject } {
@@ -942,6 +1056,7 @@ class DocumentOperator {
 
     }
 
+    // Returnes an object with information on formats applied to the given destination vector
     public getFormats(destination: DocumentVector): FormatFlags {
 
         const destinationFormats = generateFormatFlagsObject();
@@ -960,6 +1075,90 @@ class DocumentOperator {
 
     }
 
+    // Returnes an object with information on formats applied to the given range. All textNodes must have a specific format for function to return true for that format.
+    public getFormatsSelection(range: SelectionRange): FormatFlags {
+
+        const longestIdenticalPath = this.getLongestIdenticalPath(range.start, range.end);
+        const formatFlags: FormatFlags = {
+            'em': false,
+            'strong': false,
+            'u': false,
+            'title': false
+        }
+
+        if (longestIdenticalPath.length > 0) {
+
+            const formatsOfRootNode = this.getFormatsArrayOfNode(longestIdenticalPath);
+            formatsOfRootNode.forEach(format => { formatFlags[format] = true });
+            
+            // Get formats for vectors to all textNodes within the range. 
+            const selectedBranch = this.assembleBranchFromVectorToVector(longestIdenticalPath, range.start, range.end);
+            const { totalTextNodes, formatCounts } = this.countTextnodesAndFormatsFromNode(selectedBranch, longestIdenticalPath);
+
+            const formats = Object.keys(formatCounts) as format[];
+            formats.forEach(format => {
+                if (formatCounts[format] == totalTextNodes) {
+                    formatFlags[format] = true;
+                }
+            });
+
+            return formatFlags;
+
+        }
+
+        return formatFlags;
+
+    }
+
+    private countTextnodesAndFormatsFromNode(node: TextObject | FormatObject | ParagraphObject, pathToNode: number[]): { totalTextNodes: number, formatCounts: Record<format, number> } {
+    
+        const formatCounts = {
+            'em': 0,
+            'strong': 0,
+            'u': 0,
+            'title': 0
+        }
+
+        if (documentNodeIsTextNode(node)) {
+            updateFormatCounts(this.getFormatsArrayOfNode(pathToNode));
+            return { totalTextNodes: 1, formatCounts: formatCounts };
+        }
+
+        let textNodeCount = 0;
+        
+        // Recursive textNode finding function
+        const countTextNodes = (localPath: number[] = []) => {
+
+            const localNode = localPath.length > 0 ? getSubNodeInNode(node, localPath) : node;
+            //console.log('localNode: ', localNode);
+
+            if (documentNodeIsTextNode(localNode)) {
+                textNodeCount++;
+                //console.log(`${textNodeCount}: Getting formats of node with path: ${[...pathToNode, ...localPath]} created from path: ${pathToNode} and ${localPath}`);
+                //updateFormatCounts(this.getFormatsArrayOfNode([...pathToNode, ...localPath]));
+                updateFormatCounts(getFomrtasArrayOfNodeInSubNode(node, localPath));
+                return;
+            }
+
+            for (let i = 0; i < localNode.children.length; i++) {
+                //console.log('Calling function with path: ', [...localPath, i]);
+                countTextNodes([...localPath, i]);
+            }
+
+        }
+
+        countTextNodes();
+
+        return { totalTextNodes: textNodeCount, formatCounts: formatCounts };
+
+        function updateFormatCounts(flags: format[]) {
+            flags.forEach(flag => {
+                formatCounts[flag]++
+            })
+        }
+
+    }
+
     // Function returns an array of formats that the node pointed to by the path is nested in.
     private getFormatsArrayOfNode(path: number[]): format[] {
 
@@ -975,6 +1174,7 @@ class DocumentOperator {
         return formats;
 
     }
+
 
 }
 

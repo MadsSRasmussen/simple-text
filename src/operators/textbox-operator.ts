@@ -107,6 +107,9 @@ class TextboxOperator {
             end: endVector
         }
 
+        const formatFlags = this.documentOperator.getFormatsSelection(this.state.selectionRange);
+        this.state.selectionFormats = formatFlags;
+
     }
 
     // Collapses DOM - Range if any is present

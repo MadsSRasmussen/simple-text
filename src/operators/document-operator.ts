@@ -404,6 +404,236 @@ class DocumentOperator {
 
     }
 
+    // TODO -> Implement formatting of multipleParagraphs:
+    public insertFormatSelection(range: SelectionRange, format: format): { range: SelectionRange, cursorPosition: DocumentVector } {
+
+        const longestIdenticalPath = this.getLongestIdenticalPath(range.start, range.end);
+
+        // Selection is within a single paragraph:
+        if (longestIdenticalPath.length > 0) {
+
+            const rootNode = this.getNodeByPath(longestIdenticalPath);
+
+            // Assemble split sections of rootNode:
+            const firstBit = this.assembleBranchFromFirstLeadingToVector(longestIdenticalPath, range.start);
+            const lastBit = this.assembleBranchFromVectorToLastTrailing(longestIdenticalPath, range.end);
+
+            // Purge middleBit for format
+            const middleBit = this.purgeFormat(this.assembleBranchFromVectorToVector(longestIdenticalPath ,range.start, range.end), format);
+
+            // Root node is paragraphNode, update this.document.paragraphs array
+            if (documentNodeIsParagraphNode(rootNode)) {
+
+                if (!(documentNodeIsParagraphNode(firstBit) && documentNodeIsParagraphNode(middleBit) && documentNodeIsParagraphNode(lastBit))) {
+                    throw new Error('Node splits were not of the same type as rootNode');
+                }
+
+                // Create a formatNode from the children of middleBitParagraph
+                const formatNode: FormatObject = {
+                    type: 'format',
+                    format: format,
+                    children: [...middleBit.children]
+                }
+
+                const indexOfRootNodeInrootNodeParent = longestIdenticalPath[0];
+                this.document.paragraphs.splice(indexOfRootNodeInrootNodeParent, 1, firstBit, middleBit, lastBit);
+
+                const pathToFirstSplit = [indexOfRootNodeInrootNodeParent];
+                const pathToLastSplit = [indexOfRootNodeInrootNodeParent + 2];
+
+                const { purgedNode: firstSplitPurgedNode, removedOrigin: firstSplitRemovedOrigin } = this.purgeNodeForEmptyTextNodes(pathToFirstSplit);
+                const { purgedNode: lastSplitPurgedNode, removedOrigin: lastSplitRemovedOrigin } = this.purgeNodeForEmptyTextNodes(pathToLastSplit);
+
+                // Remove firstBit, middleBit, lastBit
+                this.document.paragraphs.splice(indexOfRootNodeInrootNodeParent, 3);
+
+                // Both nodes exist
+                if (firstSplitPurgedNode && lastSplitPurgedNode) {
+
+                    if (!(documentNodeIsParagraphNode(firstSplitPurgedNode) || documentNodeIsParagraphNode(lastSplitPurgedNode))) {
+                        throw new Error('Purged nodes expected as paragraphObjects');
+                    }
+
+                    const paragraphNode: ParagraphObject = {
+                        type: 'paragraph',
+                        children: [...firstBit.children, formatNode, ...lastBit.children]
+                    }
+
+                    // Insert paragraphNode
+                    this.document.paragraphs.splice(indexOfRootNodeInrootNodeParent, 0, paragraphNode);
+
+                    const pathToFormatNode = [indexOfRootNodeInrootNodeParent, 1];
+                    const resultingRange: SelectionRange = { start: this.firstLeading(pathToFormatNode), end: this.lastTrailing(pathToFormatNode) };
+                    return { range: resultingRange, cursorPosition: this.lastTrailing(pathToFormatNode) };
+
+                }
+
+                // Only firstSplit exists
+                if (firstSplitPurgedNode) {
+
+                    if (!documentNodeIsParagraphNode(firstSplitPurgedNode)) {
+                        throw new Error('Expected a paragraphObject');
+                    }
+
+                    const paragraphNode: ParagraphObject = {
+                        type: 'paragraph',
+                        children: [...firstBit.children, formatNode]
+                    };
+                    
+                    // Insert paragraphNode
+                    this.document.paragraphs.splice(indexOfRootNodeInrootNodeParent, 0, paragraphNode);
+
+                    const pathToFormatNode = [indexOfRootNodeInrootNodeParent, 1];
+                    const resultingRange: SelectionRange = { start: this.firstLeading(pathToFormatNode), end: this.lastTrailing(pathToFormatNode) };
+                    return { range: resultingRange, cursorPosition: this.lastTrailing(pathToFormatNode) };
+                }
+
+                // Only lastSplit exists
+                if (lastSplitPurgedNode) {
+
+                    if (!documentNodeIsParagraphNode(lastSplitPurgedNode)) {
+                        throw new Error('Expected a paragraphObject');
+                    }
+
+                    const paragraphNode: ParagraphObject = {
+                        type: 'paragraph',
+                        children: [formatNode, ...lastSplitPurgedNode.children]
+                    }
+
+                    this.document.paragraphs.splice(indexOfRootNodeInrootNodeParent, 0 , paragraphNode);
+
+                    const pathToFormatNode = [indexOfRootNodeInrootNodeParent, 0];
+                    const resultingRange: SelectionRange = { start: this.firstLeading(pathToFormatNode), end: this.lastTrailing(pathToFormatNode) };
+                    return { range: resultingRange, cursorPosition: this.lastTrailing(pathToFormatNode) };
+
+                }
+
+                // Neither split exists
+                if (!(firstSplitPurgedNode || lastSplitPurgedNode)) {
+
+                    const paragraphNode: ParagraphObject = {
+                        type: 'paragraph',
+                        children: [formatNode]
+                    }
+
+                    this.document.paragraphs.splice(indexOfRootNodeInrootNodeParent, 0 , paragraphNode);
+
+                    const pathToFormatNode = [indexOfRootNodeInrootNodeParent, 0];
+                    const resultingRange: SelectionRange = { start: this.firstLeading(pathToFormatNode), end: this.lastTrailing(pathToFormatNode) };
+                    return { range: resultingRange, cursorPosition: this.lastTrailing(pathToFormatNode) };
+
+                }
+
+                throw new Error('Scenario not yet implemented.');
+            }
+
+            if (documentNodeIsParagraphNode(firstBit) || documentNodeIsParagraphNode(middleBit) || documentNodeIsParagraphNode(lastBit)) {
+                throw new Error('One ot the splits of a rootNode, that was not of type ParagraphObject was a ParagraphObject');
+            }
+
+            const formatNode: FormatObject = {
+                type: 'format',
+                format: format,
+                children: [middleBit]
+            }
+
+            const rootNodeParentNode = this.getNodeByPath(longestIdenticalPath.slice(0, -1));
+            
+            if (documentNodeIsTextNode(rootNodeParentNode)) {
+                throw new Error('Parent note returned as textNode');
+            }
+
+            const indexOfrootNodeInRootNodeParent = getIndexOfChildInParentChildrenArray(rootNodeParentNode, rootNode);
+            rootNodeParentNode.children.splice(indexOfrootNodeInRootNodeParent, 1, firstBit, formatNode, lastBit);
+            
+            const pathToFirstSplit = longestIdenticalPath;
+            const pathToLastSplit = [...longestIdenticalPath.slice(0, -1), longestIdenticalPath[longestIdenticalPath.length - 1] + 2];
+
+            const { purgedNode: firstSplitPurgedNode, removedOrigin: firstSplitRemovedOrigin } = this.purgeNodeForEmptyTextNodes(pathToFirstSplit);
+            const { purgedNode: lastSplitPurgedNode, removedOrigin: lastSplitRemovedOrigin } = this.purgeNodeForEmptyTextNodes(pathToLastSplit);
+
+            // Both nodes exist:
+            if (firstSplitPurgedNode && lastSplitPurgedNode) {
+
+                if (documentNodeIsParagraphNode(firstSplitPurgedNode) || documentNodeIsParagraphNode(lastSplitPurgedNode)) {
+                    throw new Error('Purged nodes returned as ParagraphObjects');
+                }
+
+                // Replace firstSplit
+                rootNodeParentNode.children.splice(indexOfrootNodeInRootNodeParent, 1, firstSplitPurgedNode);
+
+                // Replace lastSplit
+                rootNodeParentNode.children.splice(indexOfrootNodeInRootNodeParent + 2, 1, lastSplitPurgedNode);
+
+                const pathToMiddleSplit = [...longestIdenticalPath.slice(0, -1), longestIdenticalPath[longestIdenticalPath.length - 1] + 1];
+
+                const resultingRange: SelectionRange = { start: this.firstLeading(pathToMiddleSplit), end: this.lastTrailing(pathToMiddleSplit) };
+                return { range: resultingRange, cursorPosition: this.lastTrailing(pathToMiddleSplit) };
+
+            }
+
+            // Only firstSplit exists
+            if (firstSplitPurgedNode) {
+
+                if (documentNodeIsParagraphNode(firstSplitPurgedNode)) {
+                    throw new Error('Purged node returned as ParagraphObject');
+                }
+
+                // Replace firstSplit
+                rootNodeParentNode.children.splice(indexOfrootNodeInRootNodeParent, 1, firstSplitPurgedNode);
+
+                // Remove lastSplit
+                rootNodeParentNode.children.splice(indexOfrootNodeInRootNodeParent + 2, 1);
+
+                const pathToMiddleSplit = [...longestIdenticalPath.slice(0, -1), longestIdenticalPath[longestIdenticalPath.length - 1] + 1];
+
+                const resultingRange: SelectionRange = { start: this.firstLeading(pathToMiddleSplit), end: this.lastTrailing(pathToMiddleSplit) };
+                return { range: resultingRange, cursorPosition: this.lastTrailing(pathToMiddleSplit) };
+
+            }
+
+            // Only lastSplit exists
+            if (lastSplitPurgedNode) {
+
+                if (documentNodeIsParagraphNode(lastSplitPurgedNode)) {
+                    throw new Error('Purged node returned as ParagraphObject');
+                }
+
+                // Replace lastSplit
+                rootNodeParentNode.children.splice(indexOfrootNodeInRootNodeParent + 2, 1, lastSplitPurgedNode);
+                
+                // Remove firstSplit
+                rootNodeParentNode.children.splice(indexOfrootNodeInRootNodeParent, 1);
+
+                const pathToMiddleSplit = longestIdenticalPath;
+                const resultingRange: SelectionRange = { start: this.firstLeading(pathToMiddleSplit), end: this.lastTrailing(pathToMiddleSplit) };
+                return { range: resultingRange, cursorPosition: this.lastTrailing(pathToMiddleSplit) };
+
+            }
+
+            // Neither first nor lastNode exists
+            if(!(firstSplitPurgedNode || lastSplitPurgedNode)) {
+
+                // Remove lastSplit
+                rootNodeParentNode.children.splice(indexOfrootNodeInRootNodeParent + 2, 1);
+
+                // Remove firstSplit
+                rootNodeParentNode.children.splice(indexOfrootNodeInRootNodeParent, 1);
+
+                const pathToMiddleSplit = longestIdenticalPath;
+                const resultingRange: SelectionRange = { start: this.firstLeading(pathToMiddleSplit), end: this.lastTrailing(pathToMiddleSplit) };
+                return { range: resultingRange, cursorPosition: this.lastTrailing(pathToMiddleSplit) };
+
+            }
+
+            throw new Error('Unsupported scenario...');
+
+        }
+
+        throw new Error('Scenario not yet implemented...');
+
+    }
+
     private getLongestIdenticalPath(firstVector: DocumentVector, lastVector: DocumentVector): number[] {
 
         const path: number[] = [];
@@ -930,7 +1160,7 @@ class DocumentOperator {
 
         relevantFormatNodeParentNode.children.splice(indexOfFormatInParentArray, 1, firstSplit, node, lastSplit);
 
-        // Path to splits - these must be replaced with 
+        // Path to splits - these must be replaced with purged node
         const pathToFirstSplit = [...pathToRelevantFormatNode];
         const pathToLastSplit = [...pathToRelevantFormatNode.slice(0, -1), pathToRelevantFormatNode[pathToRelevantFormatNode.length - 1] + 2];
 
@@ -1130,18 +1360,14 @@ class DocumentOperator {
         const countTextNodes = (localPath: number[] = []) => {
 
             const localNode = localPath.length > 0 ? getSubNodeInNode(node, localPath) : node;
-            //console.log('localNode: ', localNode);
 
             if (documentNodeIsTextNode(localNode)) {
                 textNodeCount++;
-                //console.log(`${textNodeCount}: Getting formats of node with path: ${[...pathToNode, ...localPath]} created from path: ${pathToNode} and ${localPath}`);
-                //updateFormatCounts(this.getFormatsArrayOfNode([...pathToNode, ...localPath]));
                 updateFormatCounts(getFomrtasArrayOfNodeInSubNode(node, localPath));
                 return;
             }
 
             for (let i = 0; i < localNode.children.length; i++) {
-                //console.log('Calling function with path: ', [...localPath, i]);
                 countTextNodes([...localPath, i]);
             }
 
@@ -1175,6 +1401,47 @@ class DocumentOperator {
 
     }
 
+    // Function to purge node for a certain format - unpacking the children of his formatNode in the parent node.
+    private purgeFormat(node: TextObject | FormatObject | ParagraphObject, format: format): TextObject | FormatObject | ParagraphObject {
+
+        if (documentNodeIsTextNode(node)) { return node };
+
+        for (let i = 0; i < node.children.length; i++) {
+
+            const child = node.children[i];
+
+            if (documentNodeIsFormatNode(child) && child.format === format) {
+                node.children.splice(i, 1, ...child.children);
+            }
+
+        }
+
+        for (let i = 0; i < node.children.length; i++) {
+
+            const child = this.purgeFormat(node.children[i], format);
+            if (documentNodeIsParagraphNode(child)) {
+                throw new Error('Document node child was a paragraph...');
+            }
+            node.children[i] = child;
+
+        }
+
+        // Join adjacent textNodes:
+        for (let i = node.children.length - 1; i > 0; i--) {
+
+            const previousChild = node.children[i - 1];
+            const currentChild = node.children[i];
+
+            if (documentNodeIsTextNode(previousChild) && documentNodeIsTextNode(currentChild)) {
+                previousChild.content += currentChild.content;
+                node.children.splice(i, 1);
+            }
+
+        }
+
+        return node;
+
+    }
 
 }
 

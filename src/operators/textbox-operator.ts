@@ -191,6 +191,24 @@ class TextboxOperator {
     }
 
     public format(format: format) {
+
+        if (this.state.selectionRange) {
+
+            if (this.state.selectionFormats[format] == true) {
+                
+                // undoFormatSelection
+
+            } else {
+
+                // insertFormatSelection
+                const { range, cursorPosition } = this.documentOperator.insertFormatSelection(this.state.selectionRange, format);
+                this.state.selectionRange = range;
+                this.state.cursor = cursorPosition;
+                this.domRenderer.render();
+            
+            }
+            return;
+        }
         
         if (this.state.selectionFormats[format] == true) {
             this.state.cursor = this.documentOperator.undoFormat(this.state.cursor, format);
